@@ -35,12 +35,16 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.awavenue.c001apk.compose.data.model.FeedItem
+import app.awavenue.c001apk.compose.data.model.upgradedCoolapkUrl
 import coil.compose.AsyncImage
 
 /**
  * Feed list: pull-to-refresh, endless load-more, tap to detail.
- * Images load the original URLs; the Flutter fork's .m.jpg thumbnail
- * rewrite is a later port, not part of the skeleton.
+ * Like the Flutter card, each item shows the title plus the message
+ * body when both exist. Images load the original URLs upgraded to
+ * https (the server hands out http URLs, which Android blocks); the
+ * Flutter fork's .m.jpg thumbnail rewrite is a later port, not part
+ * of this screen.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -179,7 +183,7 @@ private fun FeedCard(
                 val avatar = item.userAvatar?.takeIf { it.isNotEmpty() }
                 if (avatar != null) {
                     AsyncImage(
-                        model = avatar,
+                        model = avatar.upgradedCoolapkUrl(),
                         contentDescription = null,
                         modifier = Modifier
                             .size(36.dp)
@@ -213,11 +217,24 @@ private fun FeedCard(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
+            // The message body is separate from the headline (Flutter
+            // renders title + body); without this, feeds whose title
+            // is the synthetic "XXX的动态" show no post text at all.
+            val body = item.message?.takeIf { it.isNotEmpty() && it != headline }
+            if (!body.isNullOrEmpty()) {
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = body,
+                    style = MaterialTheme.typography.bodyMedium,
+                    maxLines = 6,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
             val image = item.firstImage
             if (image != null) {
                 Spacer(modifier = Modifier.height(8.dp))
                 AsyncImage(
-                    model = image,
+                    model = image.upgradedCoolapkUrl(),
                     contentDescription = null,
                     modifier = Modifier
                         .fillMaxWidth()
