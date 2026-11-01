@@ -13,8 +13,9 @@ import app.awavenue.c001apk.compose.data.repository.FeedRepository
 import app.awavenue.c001apk.compose.ui.detail.FeedDetailScreen
 import app.awavenue.c001apk.compose.ui.feed.FeedListScreen
 import app.awavenue.c001apk.compose.ui.feed.FeedViewModelFactory
+import app.awavenue.c001apk.compose.ui.search.SearchScreen
 
-/** Two routes for the skeleton: the feed list and a detail placeholder. */
+/** Routes: feed list, detail, and global search. */
 @Composable
 fun AppNavHost(
     navController: NavHostController,
@@ -31,6 +32,18 @@ fun AppNavHost(
             FeedListScreen(
                 viewModel = viewModel(factory = FeedViewModelFactory(repository)),
                 onItemClick = { feedId ->
+                    navController.navigate("feed/$feedId")
+                },
+                onSearchClick = {
+                    navController.navigate("search")
+                },
+            )
+        }
+        composable("search") {
+            SearchScreen(
+                api = api,
+                onBack = { navController.popBackStack() },
+                onFeedClick = { feedId ->
                     navController.navigate("feed/$feedId")
                 },
             )
