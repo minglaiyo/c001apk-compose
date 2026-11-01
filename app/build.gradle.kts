@@ -9,7 +9,7 @@ android {
     // Deliberately distinct from the Flutter build's app.awavenue.c001apk,
     // so the native skeleton and the Flutter app can coexist on one device.
     namespace = "app.awavenue.c001apk.compose"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "app.awavenue.c001apk.compose"
