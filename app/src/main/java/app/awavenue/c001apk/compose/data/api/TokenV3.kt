@@ -50,7 +50,13 @@ object TokenV3 {
                 String(Base64.decode(segmentAscii, Base64.DEFAULT), Charsets.UTF_8)
             val plain =
                 "$APP_ID&$segment&${md5(deviceCode)}&$time&$appCode"
-            val password = md5(base64NoPad(plain))
+            // NOTE: Dart uses base64Encode (WITH padding) here, while the
+            // source line below uses getBase64 (padding stripped). Using
+            // the stripped form for the password produces a wrong bcrypt
+            // input whenever plain's length is not a multiple of 3, which
+            // makes the server reject the token. This was the bug that
+            // left the signed build's feed empty.
+            val password = md5(base64WithPad(plain))
             val source = base64NoPad("${time.toString(16)}/${md5(plain)}")
                 .substring(0, 22)
             val adjusted = ((ALPHABET.indexOf(source[21]) - 5) % 64 + 64) % 64
@@ -92,6 +98,9 @@ object TokenV3 {
     private fun base64NoPad(input: String): String =
         Base64.encodeToString(input.toByteArray(Charsets.UTF_8), Base64.NO_WRAP)
             .replace("=", "")
+
+    private fun base64WithPad(input: String): String =
+        Base64.encodeToString(input.toByteArray(Charsets.UTF_8), Base64.NO_WRAP)
 
     private fun md5(input: String): String {
         val digest = MessageDigest.getInstance("MD5")
