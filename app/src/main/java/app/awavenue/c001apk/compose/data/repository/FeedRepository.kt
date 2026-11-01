@@ -41,7 +41,13 @@ class FeedRepository(private val api: CoolapkApi) {
             it.copy(isRefreshing = true, error = null, endReached = false)
         }
         try {
-            val response = api.getDataList(url = pageUrl, page = 1)
+            val response = api.getDataList(
+                url = pageUrl,
+                // The Flutter HOT tab passes title '热榜' for this URL;
+                // mirror it exactly instead of the empty default.
+                title = if (pageUrl == DEFAULT_PAGE_URL) "热榜" else "",
+                page = 1,
+            )
             val feeds = response.data.orEmpty().filter { it.entityType == "feed" }
             _state.update {
                 it.copy(items = feeds, isRefreshing = false)
