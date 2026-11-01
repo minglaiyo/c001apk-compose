@@ -24,6 +24,8 @@ object ApiClient {
         coerceInputValues = true
     }
 
+    private val sessionJar = InMemoryCookieJar()
+
     /**
      * Shared OkHttp client: signing headers, anonymous session cookie
      * jar, and basic logging. Coil reuses this client too, because the
@@ -35,10 +37,15 @@ object ApiClient {
             level = HttpLoggingInterceptor.Level.BASIC
         }
         OkHttpClient.Builder()
-            .cookieJar(CaptchaCookieJar(InMemoryCookieJar()))
+            .cookieJar(CaptchaCookieJar(AuthCookieJar(sessionJar)))
             .addInterceptor(CoolapkHeaders())
             .addInterceptor(logging)
             .build()
+    }
+
+    /** Drops the in-memory anonymous session (SESSID). Called on login, logout, account switch and account removal, mirroring the Flutter fork's session-generation bump. */
+    fun clearSessionCookies() {
+        sessionJar.clear()
     }
 
     fun create(): CoolapkApi {
@@ -59,7 +66,7 @@ object ApiClient {
  * mirroring the Flutter app's session handling for logged-out browsing.
  * Nothing is persisted; the store dies with the process.
  */
-private class InMemoryCookieJar : CookieJar {
+internal class InMemoryCookieJar : CookieJar {
     private val store = mutableMapOf<String, MutableList<Cookie>>()
 
     override fun saveFromResponse(url: HttpUrl, cookies: List<Cookie>) {
@@ -73,6 +80,40 @@ private class InMemoryCookieJar : CookieJar {
 
     override fun loadForRequest(url: HttpUrl): List<Cookie> =
         store[url.host].orEmpty()
+
+    fun cookiesFor(url: HttpUrl): List<Cookie> = store[url.host].orEmpty()
+
+    fun clear() {
+        store.clear()
+    }
+}
+
+/**
+ * Appends the logged-in account's uid/username/token cookies to API
+ * requests, exactly the identity difference between the Flutter
+ * interceptor's logged-in and anonymous Cookie headers. Reads the
+ * current account on every request, so logout/switch/removal take
+ * effect immediately without touching the jar.
+ */
+private class AuthCookieJar(
+    private val delegate: CookieJar,
+) : CookieJar {
+
+    override fun saveFromResponse(url: HttpUrl, cookies: List<Cookie>) {
+        delegate.saveFromResponse(url, cookies)
+    }
+
+    override fun loadForRequest(url: HttpUrl): List<Cookie> {
+        val cookies = delegate.loadForRequest(url).toMutableList()
+        if (url.host == "api.coolapk.com" || url.host == "api2.coolapk.com") {
+            app.awavenue.c001apk.compose.data.session.AccountStore.current?.let { account ->
+                Cookie.parse(url, "uid=${account.uid}")?.let { cookies += it }
+                Cookie.parse(url, "username=${account.username}")?.let { cookies += it }
+                Cookie.parse(url, "token=${account.token}")?.let { cookies += it }
+            }
+        }
+        return cookies
+    }
 }
 
 /**
