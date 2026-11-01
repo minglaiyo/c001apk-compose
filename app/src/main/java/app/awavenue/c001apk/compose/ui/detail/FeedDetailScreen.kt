@@ -40,12 +40,15 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import app.awavenue.c001apk.compose.data.api.CaptchaChallenge
+import app.awavenue.c001apk.compose.data.api.CaptchaProofStore
 import app.awavenue.c001apk.compose.data.api.CoolapkApi
 import app.awavenue.c001apk.compose.data.model.FeedDetail
 import app.awavenue.c001apk.compose.data.model.ReplyItem
 import app.awavenue.c001apk.compose.data.model.parseFeedDetail
 import app.awavenue.c001apk.compose.data.model.stripHtml
 import app.awavenue.c001apk.compose.data.model.upgradedCoolapkUrl
+import app.awavenue.c001apk.compose.ui.captcha.CaptchaWebView
 import coil.compose.AsyncImage
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -78,6 +81,13 @@ fun FeedDetailScreen(
     // with message "当前访问需要验证码" and data null, so without this
     // the page would look blank for no visible reason).
     var detailNotice by remember { mutableStateOf<String?>(null) }
+    // Captcha challenge parsed from a gated response, if any, plus the
+    // verification UI state. The detail request itself never prompts
+    // on its own (mirroring Flutter's verify:false default for detail):
+    // the user taps 去验证 explicitly.
+    var captchaChallenge by remember { mutableStateOf<CaptchaChallenge?>(null) }
+    var replyChallenge by remember { mutableStateOf<CaptchaChallenge?>(null) }
+    var verifying by remember { mutableStateOf(false) }
     var replies by remember { mutableStateOf<List<ReplyItem>>(emptyList()) }
     var replyPage by remember { mutableStateOf(1) }
     var replyEndReached by remember { mutableStateOf(false) }
@@ -99,7 +109,12 @@ fun FeedDetailScreen(
                 replyEndReached = true
                 if (page == 1) {
                     replyNotice = response.message?.takeIf { it.isNotEmpty() }
+                    replyChallenge = CaptchaChallenge.fromEnvelope(
+                        response.messageStatus, response.messageExtra,
+                    )
                 }
+            } else if (page == 1) {
+                replyChallenge = null
             }
         } catch (e: Exception) {
             replyError = e.message ?: "加载评论失败"
@@ -112,6 +127,9 @@ fun FeedDetailScreen(
         detail = null
         detailError = null
         detailNotice = null
+        captchaChallenge = null
+        replyChallenge = null
+        verifying = false
         replies = emptyList()
         replyPage = 1
         replyEndReached = false
@@ -126,6 +144,18 @@ fun FeedDetailScreen(
                 parsed.images.isEmpty()
             ) {
                 detailNotice = response.message?.takeIf { it.isNotEmpty() }
+                val challenge = CaptchaChallenge.fromEnvelope(
+                    response.messageStatus, response.messageExtra,
+                )
+                captchaChallenge = challenge
+                // A gated response arriving while a matching proof is
+                // attached means the server refused that proof: drop it
+                // (mirroring Flutter's invalidation) and say so plainly.
+                val proof = CaptchaProofStore.validProof()
+                if (challenge != null && proof != null && challenge.acceptsProof(proof)) {
+                    CaptchaProofStore.clear()
+                    detailNotice = "验证已完成，但服务端仍未允许读取详情，可稍后重试"
+                }
             }
             loadReplyPage(1, null)
         } catch (e: Exception) {
@@ -149,7 +179,19 @@ fun FeedDetailScreen(
             )
         },
     ) { padding ->
-        when {
+        val verifyChallenge = captchaChallenge ?: replyChallenge
+        if (verifying && verifyChallenge != null) {
+            CaptchaWebView(
+                challenge = verifyChallenge,
+                onVerified = { validate ->
+                    verifyChallenge.proof(validate)?.let { CaptchaProofStore.save(it) }
+                    verifying = false
+                    detailAttempt++
+                },
+                onCancel = { verifying = false },
+                modifier = Modifier.fillMaxSize().padding(padding),
+            )
+        } else when {
             detailError != null -> {
                 Box(
                     modifier = Modifier.fillMaxSize().padding(padding),
@@ -236,6 +278,16 @@ fun FeedDetailScreen(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
                         }
+                        if (captchaChallenge != null) {
+                            item {
+                                Button(
+                                    onClick = { verifying = true },
+                                    modifier = Modifier.padding(top = 4.dp),
+                                ) {
+                                    Text("去验证")
+                                }
+                            }
+                        }
                     }
                     items(current.images, key = { it }) { url ->
                         AsyncImage(
@@ -320,13 +372,24 @@ fun FeedDetailScreen(
                                 }
                             }
                             replyNotice != null -> {
-                                Text(
-                                    text = replyNotice ?: "",
+                                Column(
                                     modifier = Modifier.fillMaxWidth(),
-                                    textAlign = TextAlign.Center,
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                )
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                ) {
+                                    Text(
+                                        text = replyNotice ?: "",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                    if (replyChallenge != null) {
+                                        Button(
+                                            onClick = { verifying = true },
+                                            modifier = Modifier.padding(top = 8.dp),
+                                        ) {
+                                            Text("去验证")
+                                        }
+                                    }
+                                }
                             }
                             replyEndReached -> {
                                 Text(
