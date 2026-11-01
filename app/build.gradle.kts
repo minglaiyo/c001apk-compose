@@ -71,6 +71,7 @@ dependencies {
     implementation(libs.okhttp.logging)
     implementation(libs.kotlinx.serialization.json)
     implementation(libs.coil.compose)
+    implementation(libs.coil.okhttp)
     implementation(libs.jbcrypt)
     testImplementation(libs.junit)
 }
