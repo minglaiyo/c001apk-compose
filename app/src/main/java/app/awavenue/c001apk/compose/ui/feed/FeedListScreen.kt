@@ -209,7 +209,18 @@ private fun FeedCard(
                 }
             }
             val headline = item.headline?.stripHtml()
-            if (!headline.isNullOrEmpty()) {
+            // The message body is separate from the headline (Flutter
+            // renders title + body); without this, feeds whose title
+            // is the synthetic "XXX的动态" show no post text at all.
+            val body = item.message?.stripHtml()?.takeIf { it.isNotEmpty() && it != headline }
+            // The server's synthetic moment title ("XXX的动态") only
+            // repeats the author line, so moment cards hide it and show
+            // only the body; a real title (message_title) still shows.
+            // When there is no body, the headline stays so the card is
+            // not left empty.
+            val redundantHeadline = !item.username.isNullOrEmpty() &&
+                headline == "${item.username}的动态"
+            if (!headline.isNullOrEmpty() && (!redundantHeadline || body.isNullOrEmpty())) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
                     text = headline,
@@ -218,10 +229,6 @@ private fun FeedCard(
                     overflow = TextOverflow.Ellipsis,
                 )
             }
-            // The message body is separate from the headline (Flutter
-            // renders title + body); without this, feeds whose title
-            // is the synthetic "XXX的动态" show no post text at all.
-            val body = item.message?.stripHtml()?.takeIf { it.isNotEmpty() && it != headline }
             if (!body.isNullOrEmpty()) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
