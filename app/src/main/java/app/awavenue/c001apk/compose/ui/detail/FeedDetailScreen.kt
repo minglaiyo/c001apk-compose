@@ -44,6 +44,7 @@ import app.awavenue.c001apk.compose.data.api.CoolapkApi
 import app.awavenue.c001apk.compose.data.model.FeedDetail
 import app.awavenue.c001apk.compose.data.model.ReplyItem
 import app.awavenue.c001apk.compose.data.model.parseFeedDetail
+import app.awavenue.c001apk.compose.data.model.stripHtml
 import app.awavenue.c001apk.compose.data.model.upgradedCoolapkUrl
 import coil.compose.AsyncImage
 import java.text.SimpleDateFormat
@@ -205,25 +206,25 @@ fun FeedDetailScreen(
                             }
                         }
                     }
-                    if (!current.title.isNullOrEmpty()) {
+                    if (!current.title?.stripHtml().isNullOrEmpty()) {
                         item {
                             Text(
-                                text = current.title,
+                                text = current.title?.stripHtml() ?: "",
                                 style = MaterialTheme.typography.titleMedium,
                             )
                         }
                     }
-                    if (!current.body.isNullOrEmpty()) {
+                    if (!current.body?.stripHtml().isNullOrEmpty()) {
                         item {
                             Text(
-                                text = current.body,
+                                text = current.body?.stripHtml() ?: "",
                                 style = MaterialTheme.typography.bodyMedium,
                             )
                         }
                     }
                     if (current.images.isEmpty() &&
-                        current.title.isNullOrEmpty() &&
-                        current.body.isNullOrEmpty()
+                        current.title?.stripHtml().isNullOrEmpty() &&
+                        current.body?.stripHtml().isNullOrEmpty()
                     ) {
                         item {
                             Text(
@@ -374,9 +375,9 @@ private fun ReplyRow(reply: ReplyItem) {
                 text = name,
                 style = MaterialTheme.typography.titleSmall,
             )
-            if (!reply.message.isNullOrEmpty()) {
+            if (!reply.message?.stripHtml().isNullOrEmpty()) {
                 Text(
-                    text = reply.message,
+                    text = reply.message?.stripHtml() ?: "",
                     style = MaterialTheme.typography.bodyMedium,
                 )
             }
