@@ -123,7 +123,9 @@ class FeedRepository(private val api: CoolapkApi) {
         fun withLike(source: FeedItem, likedValue: Boolean, count: Int): FeedItem {
             return source.copy(
                 likenum = JsonPrimitive(count),
-                userAction = buildJsonObject { put("like", if (likedValue) 1 else 0) },
+                userAction = buildJsonObject {
+                    put("like", JsonPrimitive(if (likedValue) 1 else 0))
+                },
             )
         }
         _state.update { state ->
