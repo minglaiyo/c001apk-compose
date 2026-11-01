@@ -66,6 +66,12 @@ interface CoolapkApi {
         @Query("id") id: String,
     ): ApiObjectResponse
 
+    /** Topic detail (Flutter: GET /v6/topic/newTagDetail?tag=). */
+    @GET("v6/topic/newTagDetail")
+    suspend fun getTopicDetail(
+        @Query("tag") tag: String,
+    ): ApiObjectResponse
+
     /**
      * Hot searches (Flutter: GET /v6/search?type=hotSearch&refresh=1&
      * returnType=all). Returns the raw envelope: the hot payload is
@@ -89,8 +95,10 @@ interface CoolapkApi {
     /**
      * Search results (Flutter: NetworkRepo.getSearch, GET /v6/search).
      * The feed tab (type=feed) returns full feed items, so results
-     * reuse FeedItem + FeedCard. Other tabs (apk/game/feedTopic/
-     * product/user) need their own cards and are not built yet.
+     * reuse FeedItem + FeedCard; the other tabs (apk/game/feedTopic/
+     * product/user) render the same rows as AppCard. pageType /
+     * pageParam carry scoped search (topic pages pass tag, product
+     * pages pass product_phone); null means global search.
      */
     @GET("v6/search")
     suspend fun getSearch(
@@ -103,5 +111,7 @@ interface CoolapkApi {
         @Query("firstItem") firstItem: String? = null,
         @Query("lastItem") lastItem: String? = null,
         @Query("showAnonymous") showAnonymous: Int = -1,
+        @Query("pageType") pageType: String? = null,
+        @Query("pageParam") pageParam: String? = null,
     ): ApiListResponse
 }
