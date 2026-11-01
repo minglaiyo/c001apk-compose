@@ -1,11 +1,14 @@
 package app.awavenue.c001apk.compose.ui.detail
 
+import android.widget.Toast
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -16,9 +19,13 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -37,23 +44,29 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import app.awavenue.c001apk.compose.data.api.CaptchaChallenge
 import app.awavenue.c001apk.compose.data.api.CaptchaProofStore
 import app.awavenue.c001apk.compose.data.api.CoolapkApi
+import app.awavenue.c001apk.compose.data.api.toggleLike
 import app.awavenue.c001apk.compose.data.model.FeedDetail
 import app.awavenue.c001apk.compose.data.model.ReplyItem
+import app.awavenue.c001apk.compose.data.model.asText
 import app.awavenue.c001apk.compose.data.model.parseFeedDetail
 import app.awavenue.c001apk.compose.data.model.stripHtml
 import app.awavenue.c001apk.compose.data.model.upgradedCoolapkUrl
+import app.awavenue.c001apk.compose.data.session.AccountStore
 import app.awavenue.c001apk.compose.ui.captcha.CaptchaWebView
 import coil.compose.AsyncImage
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import kotlinx.coroutines.launch
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
 
 /**
  * Full detail screen for one feed: author header, title, body, images,
@@ -72,6 +85,10 @@ fun FeedDetailScreen(
     feedId: String,
     onBack: () -> Unit,
     modifier: Modifier = Modifier,
+    onReplyClick: () -> Unit = {},
+    onReplyToReply: (String, String) -> Unit = { _, _ -> },
+    replyPublished: Boolean = false,
+    onReplyPublishedConsumed: () -> Unit = {},
 ) {
     var detail by remember { mutableStateOf<FeedDetail?>(null) }
     var detailError by remember { mutableStateOf<String?>(null) }
@@ -94,7 +111,10 @@ fun FeedDetailScreen(
     var replyLoading by remember { mutableStateOf(false) }
     var replyError by remember { mutableStateOf<String?>(null) }
     var replyNotice by remember { mutableStateOf<String?>(null) }
+    var detailLiked by remember { mutableStateOf(false) }
+    var detailLikeCount by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
 
     suspend fun loadReplyPage(page: Int, lastItem: String?) {
         if (replyLoading) return
@@ -123,6 +143,68 @@ fun FeedDetailScreen(
         }
     }
 
+    fun toggleDetailLike() {
+        if (!AccountStore.isLoggedIn) return
+        val wasLiked = detailLiked
+        val oldCount = detailLikeCount?.toIntOrNull() ?: 0
+        detailLiked = !wasLiked
+        detailLikeCount = ((oldCount + if (!wasLiked) 1 else -1).coerceAtLeast(0)).toString()
+        scope.launch {
+            val outcome = toggleLike(api, feedId, wasLiked, isReply = false)
+            if (outcome.ok) {
+                outcome.likeCount()?.let { detailLikeCount = it }
+            } else {
+                detailLiked = wasLiked
+                detailLikeCount = oldCount.toString()
+                Toast.makeText(
+                    context,
+                    outcome.message.ifEmpty { "操作失败" },
+                    Toast.LENGTH_SHORT,
+                ).show()
+            }
+        }
+    }
+
+    fun toggleReplyLike(reply: ReplyItem) {
+        val id = reply.displayId ?: return
+        if (!AccountStore.isLoggedIn) return
+        val wasLiked = reply.liked
+        val oldCount = reply.likenum.asText()?.toIntOrNull() ?: 0
+        val newLiked = !wasLiked
+        val newCount = (oldCount + if (newLiked) 1 else -1).coerceAtLeast(0)
+        fun withLike(source: ReplyItem, likedValue: Boolean, count: Int): ReplyItem {
+            return source.copy(
+                likenum = JsonPrimitive(count),
+                userAction = buildJsonObject { put("like", if (likedValue) 1 else 0) },
+            )
+        }
+        replies = replies.map { if (it.displayId == id) withLike(it, newLiked, newCount) else it }
+        scope.launch {
+            val outcome = toggleLike(api, id, wasLiked, isReply = true)
+            if (outcome.ok) {
+                outcome.likeCount()?.toIntOrNull()?.let { serverCount ->
+                    replies = replies.map {
+                        if (it.displayId == id) withLike(it, newLiked, serverCount) else it
+                    }
+                }
+            } else {
+                replies = replies.map { if (it.displayId == id) reply else it }
+                Toast.makeText(
+                    context,
+                    outcome.message.ifEmpty { "操作失败" },
+                    Toast.LENGTH_SHORT,
+                ).show()
+            }
+        }
+    }
+
+    LaunchedEffect(replyPublished) {
+        if (replyPublished) {
+            loadReplyPage(1, null)
+            onReplyPublishedConsumed()
+        }
+    }
+
     LaunchedEffect(feedId, detailAttempt) {
         detail = null
         detailError = null
@@ -139,6 +221,8 @@ fun FeedDetailScreen(
             val response = api.getFeedDetail(feedId)
             val parsed = parseFeedDetail(response.data)
             detail = parsed
+            detailLiked = false
+            detailLikeCount = parsed.likeCount
             if (parsed.title.isNullOrEmpty() &&
                 parsed.body.isNullOrEmpty() &&
                 parsed.images.isEmpty()
@@ -177,6 +261,16 @@ fun FeedDetailScreen(
                     }
                 },
             )
+        },
+        floatingActionButton = {
+            if (AccountStore.isLoggedIn) {
+                FloatingActionButton(onClick = onReplyClick) {
+                    Icon(
+                        imageVector = Icons.Default.Edit,
+                        contentDescription = "回复",
+                    )
+                }
+            }
         },
     ) { padding ->
         val verifyChallenge = captchaChallenge ?: replyChallenge
@@ -300,8 +394,37 @@ fun FeedDetailScreen(
                         )
                     }
                     item {
-                        Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                            if (!current.likeCount.isNullOrEmpty()) {
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(16.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                        ) {
+                            if (AccountStore.isLoggedIn) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.clickable { toggleDetailLike() },
+                                ) {
+                                    Icon(
+                                        imageVector = if (detailLiked) {
+                                            Icons.Default.Favorite
+                                        } else {
+                                            Icons.Default.FavoriteBorder
+                                        },
+                                        contentDescription = if (detailLiked) "取消点赞" else "点赞",
+                                        tint = if (detailLiked) {
+                                            MaterialTheme.colorScheme.error
+                                        } else {
+                                            MaterialTheme.colorScheme.onSurfaceVariant
+                                        },
+                                        modifier = Modifier.size(16.dp),
+                                    )
+                                    Spacer(modifier = Modifier.size(4.dp))
+                                    Text(
+                                        text = "赞 ${detailLikeCount ?: current.likeCount ?: "0"}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                    )
+                                }
+                            } else if (!current.likeCount.isNullOrEmpty()) {
                                 Text(
                                     text = "赞 ${current.likeCount}",
                                     style = MaterialTheme.typography.bodySmall,
@@ -329,7 +452,16 @@ fun FeedDetailScreen(
                         replies,
                         key = { it.displayId ?: it.hashCode().toString() },
                     ) { reply ->
-                        ReplyRow(reply)
+                        ReplyRow(
+                            reply = reply,
+                            showActions = AccountStore.isLoggedIn,
+                            onLikeClick = { toggleReplyLike(reply) },
+                            onReplyClick = {
+                                reply.displayId?.let { id ->
+                                    onReplyToReply(id, reply.username.orEmpty())
+                                }
+                            },
+                        )
                     }
                     item {
                         when {
@@ -424,7 +556,12 @@ fun FeedDetailScreen(
 
 /** One reply card: avatar, author (+ replied-to user), text, image, counts. */
 @Composable
-private fun ReplyRow(reply: ReplyItem) {
+private fun ReplyRow(
+    reply: ReplyItem,
+    showActions: Boolean = false,
+    onLikeClick: () -> Unit = {},
+    onReplyClick: () -> Unit = {},
+) {
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Avatar(url = reply.userAvatar, name = reply.username, size = 36.dp)
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -454,17 +591,67 @@ private fun ReplyRow(reply: ReplyItem) {
                     contentScale = ContentScale.FillWidth,
                 )
             }
-            val meta = listOfNotNull(
-                reply.likeCount?.let { "赞 $it" },
-                reply.replyCount?.let { "$it 条回复" },
-                formatTime(reply.timeMillis),
-            ).joinToString(" · ")
-            if (meta.isNotEmpty()) {
-                Text(
-                    text = meta,
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+            if (showActions) {
+                val meta = listOfNotNull(
+                    reply.replyCount?.let { "$it 条回复" },
+                    formatTime(reply.timeMillis),
+                ).joinToString(" · ")
+                if (meta.isNotEmpty()) {
+                    Text(
+                        text = meta,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(16.dp),
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.clickable(onClick = onLikeClick),
+                    ) {
+                        Icon(
+                            imageVector = if (reply.liked) {
+                                Icons.Default.Favorite
+                            } else {
+                                Icons.Default.FavoriteBorder
+                            },
+                            contentDescription = if (reply.liked) "取消点赞" else "点赞",
+                            tint = if (reply.liked) {
+                                MaterialTheme.colorScheme.error
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                            modifier = Modifier.size(16.dp),
+                        )
+                        Spacer(modifier = Modifier.size(4.dp))
+                        Text(
+                            text = "赞 ${reply.likeCount ?: "0"}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    Text(
+                        text = "回复",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.clickable(onClick = onReplyClick),
+                    )
+                }
+            } else {
+                val plainMeta = listOfNotNull(
+                    reply.likeCount?.let { "赞 $it" },
+                    reply.replyCount?.let { "$it 条回复" },
+                    formatTime(reply.timeMillis),
+                ).joinToString(" · ")
+                if (plainMeta.isNotEmpty()) {
+                    Text(
+                        text = plainMeta,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
             }
         }
     }
