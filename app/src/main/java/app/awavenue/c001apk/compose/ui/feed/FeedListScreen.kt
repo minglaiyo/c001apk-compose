@@ -1,5 +1,6 @@
 package app.awavenue.c001apk.compose.ui.feed
 
+import android.widget.Toast
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -16,12 +17,14 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -37,11 +40,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.awavenue.c001apk.compose.data.model.FeedItem
 import app.awavenue.c001apk.compose.data.model.stripHtml
 import app.awavenue.c001apk.compose.data.model.upgradedCoolapkUrl
+import app.awavenue.c001apk.compose.data.session.AccountStore
 import coil.compose.AsyncImage
 
 /**
@@ -59,9 +64,18 @@ fun FeedListScreen(
     onItemClick: (feedId: String) -> Unit,
     onSearchClick: () -> Unit = {},
     onAccountClick: () -> Unit = {},
+    onPublishClick: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
+    val context = LocalContext.current
+
+    state.likeError?.let { message ->
+        LaunchedEffect(message) {
+            Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
+            viewModel.consumeLikeError()
+        }
+    }
 
     Scaffold(
         modifier = modifier,
@@ -83,6 +97,18 @@ fun FeedListScreen(
                     }
                 },
             )
+        },
+        floatingActionButton = {
+            // Flutter hides the publish entry when logged out; the
+            // handler guards again, so a stale composition can't post.
+            if (AccountStore.isLoggedIn) {
+                FloatingActionButton(onClick = onPublishClick) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = "发布动态",
+                    )
+                }
+            }
         },
     ) { padding ->
         PullToRefreshBox(
@@ -135,6 +161,8 @@ fun FeedListScreen(
                                 onClick = {
                                     item.displayId?.let { onItemClick(it) }
                                 },
+                                showLikeButton = AccountStore.isLoggedIn,
+                                onLikeClick = { viewModel.toggleLike(item) },
                             )
                         }
                         item {
