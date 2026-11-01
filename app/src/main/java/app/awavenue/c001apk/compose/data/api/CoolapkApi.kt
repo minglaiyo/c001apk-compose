@@ -4,7 +4,12 @@ import app.awavenue.c001apk.compose.data.model.ApiListResponse
 import app.awavenue.c001apk.compose.data.model.ApiObjectResponse
 import app.awavenue.c001apk.compose.data.model.ApiReplyListResponse
 import kotlinx.serialization.json.JsonObject
+import okhttp3.ResponseBody
+import retrofit2.Response
+import retrofit2.http.Field
+import retrofit2.http.FormUrlEncoded
 import retrofit2.http.GET
+import retrofit2.http.POST
 import retrofit2.http.Query
 
 /**
@@ -114,4 +119,134 @@ interface CoolapkApi {
         @Query("pageType") pageType: String? = null,
         @Query("pageParam") pageParam: String? = null,
     ): ApiListResponse
+
+    // ---- Write operations (stage 4, batch 1: text only) ----
+
+    /**
+     * Creates a feed (Flutter: POST /v6/feed/createFeed). type is
+     * "feed", or "comment" for app comments; targetType/targetId
+     * carry topic (tag), product (product_phone) or app (apk)
+     * association; status is always 1 and publish_status selects
+     * visibility (1 = only self, 0 = public). pic is the
+     * comma-joined uploaded image URL string (batch 2).
+     */
+    @FormUrlEncoded
+    @POST("v6/feed/createFeed")
+    suspend fun createFeed(
+        @Field("type") type: String,
+        @Field("targetType") targetType: String?,
+        @Field("targetId") targetId: String?,
+        @Field("message") message: String,
+        @Field("status") status: Int = 1,
+        @Field("publish_status") publishStatus: Int,
+        @Field("pic") pic: String?,
+    ): JsonObject
+
+    /**
+     * Replies to a feed or a reply (Flutter: POST /v6/feed/reply,
+     * query id + type). type is "feed" (reply to a feed) or "reply"
+     * (reply to a comment); replyAndForward is 1 for 回复并转发.
+     */
+    @FormUrlEncoded
+    @POST("v6/feed/reply")
+    suspend fun reply(
+        @Query("id") id: String,
+        @Query("type") type: String,
+        @Field("message") message: String,
+        @Field("replyAndForward") replyAndForward: Int,
+        @Field("pic") pic: String?,
+    ): JsonObject
+
+    /**
+     * Like/unlike, all four sharing the Flutter helper's shape:
+     * query id + detail=0, body trace="". Feed likes return the new
+     * count inside data.count; reply likes return the count as data.
+     */
+    @FormUrlEncoded
+    @POST("v6/feed/like")
+    suspend fun likeFeed(
+        @Query("id") id: String,
+        @Query("detail") detail: Int = 0,
+        @Field("trace") trace: String = "",
+    ): JsonObject
+
+    @FormUrlEncoded
+    @POST("v6/feed/unlike")
+    suspend fun unlikeFeed(
+        @Query("id") id: String,
+        @Query("detail") detail: Int = 0,
+        @Field("trace") trace: String = "",
+    ): JsonObject
+
+    @FormUrlEncoded
+    @POST("v6/feed/likeReply")
+    suspend fun likeReply(
+        @Query("id") id: String,
+        @Query("detail") detail: Int = 0,
+        @Field("trace") trace: String = "",
+    ): JsonObject
+
+    @FormUrlEncoded
+    @POST("v6/feed/unLikeReply")
+    suspend fun unLikeReply(
+        @Query("id") id: String,
+        @Query("detail") detail: Int = 0,
+        @Field("trace") trace: String = "",
+    ): JsonObject
+
+    /** Follow/unfollow a user (query uid, same trace body). */
+    @FormUrlEncoded
+    @POST("v6/user/follow")
+    suspend fun followUser(
+        @Query("uid") uid: String,
+        @Field("trace") trace: String = "",
+    ): JsonObject
+
+    @FormUrlEncoded
+    @POST("v6/user/unfollow")
+    suspend fun unfollowUser(
+        @Query("uid") uid: String,
+        @Field("trace") trace: String = "",
+    ): JsonObject
+
+    /** Follow/unfollow a topic (GET, query tag = topic name). */
+    @GET("v6/feed/followTag")
+    suspend fun followTag(
+        @Query("tag") tag: String,
+    ): JsonObject
+
+    @GET("v6/feed/unFollowTag")
+    suspend fun unFollowTag(
+        @Query("tag") tag: String,
+    ): JsonObject
+
+    /**
+     * Follow/unfollow a product. Note the inverted semantics:
+     * currently followed -> status 0 cancels, otherwise status 1.
+     */
+    @FormUrlEncoded
+    @POST("v6/product/changeFollowStatus")
+    suspend fun changeProductFollow(
+        @Field("id") id: String,
+        @Field("status") status: Int,
+    ): JsonObject
+
+    /**
+     * Write-operation image captcha (v1, NOT the Netease v2 detail
+     * flow): image bytes, then POST /v6/account/requestValidate
+     * with type err_request_captcha; success is data == "验证通过".
+     */
+    @GET("v6/account/captchaImage")
+    suspend fun captchaImage(
+        @Query("_") timestamp: Long,
+        @Query("w") width: Int = 270,
+        @Query("h") height: Int = 113,
+    ): Response<ResponseBody>
+
+    @FormUrlEncoded
+    @POST("v6/account/requestValidate")
+    suspend fun requestValidate(
+        @Field("type") type: String,
+        @Field("code") code: String,
+    ): JsonObject
 }
