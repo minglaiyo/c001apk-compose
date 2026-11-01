@@ -180,3 +180,17 @@ data class ApiReplyListResponse(
     val message: String? = null,
     val data: List<ReplyItem>? = null,
 )
+
+/**
+ * Upgrades Coolapk http image/avatar URLs to https. The server still
+ * hands out http://image.coolapk.com and http://avatar.coolapk.com
+ * URLs, but Android blocks cleartext loads, so Coil would fail every
+ * one of them. Both hosts serve https (verified 2026-11-01); other
+ * hosts are left untouched.
+ */
+fun String.upgradedCoolapkUrl(): String {
+    if (!startsWith("http://")) return this
+    val host = substringAfter("http://").substringBefore("/")
+    if (!host.endsWith(".coolapk.com")) return this
+    return "https://" + substringAfter("http://")
+}
