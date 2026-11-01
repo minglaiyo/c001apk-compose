@@ -75,7 +75,7 @@ data class CaptchaChallenge(
             when (messageExtra) {
                 is JsonObject -> extra = messageExtra
                 is kotlinx.serialization.json.JsonPrimitive -> {
-                    val text = messageExtra.jsonPrimitive.content
+                    val text = messageExtra.content
                     extra = try {
                         Json.parseToJsonElement(text).jsonObject
                     } catch (_: Exception) {
