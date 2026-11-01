@@ -44,6 +44,7 @@ import app.awavenue.c001apk.compose.data.api.CoolapkApi
 import app.awavenue.c001apk.compose.data.model.FeedDetail
 import app.awavenue.c001apk.compose.data.model.ReplyItem
 import app.awavenue.c001apk.compose.data.model.parseFeedDetail
+import app.awavenue.c001apk.compose.data.model.upgradedCoolapkUrl
 import coil.compose.AsyncImage
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -71,11 +72,17 @@ fun FeedDetailScreen(
     var detail by remember { mutableStateOf<FeedDetail?>(null) }
     var detailError by remember { mutableStateOf<String?>(null) }
     var detailAttempt by remember { mutableStateOf(0) }
+    // Server message shown when the detail comes back empty (anonymous
+    // detail requests are captcha-gated: the server answers HTTP 200
+    // with message "当前访问需要验证码" and data null, so without this
+    // the page would look blank for no visible reason).
+    var detailNotice by remember { mutableStateOf<String?>(null) }
     var replies by remember { mutableStateOf<List<ReplyItem>>(emptyList()) }
     var replyPage by remember { mutableStateOf(1) }
     var replyEndReached by remember { mutableStateOf(false) }
     var replyLoading by remember { mutableStateOf(false) }
     var replyError by remember { mutableStateOf<String?>(null) }
+    var replyNotice by remember { mutableStateOf<String?>(null) }
     val scope = rememberCoroutineScope()
 
     suspend fun loadReplyPage(page: Int, lastItem: String?) {
@@ -87,7 +94,12 @@ fun FeedDetailScreen(
             val items = response.data.orEmpty()
             replies = if (page == 1) items else replies + items
             replyPage = page
-            if (items.isEmpty()) replyEndReached = true
+            if (items.isEmpty()) {
+                replyEndReached = true
+                if (page == 1) {
+                    replyNotice = response.message?.takeIf { it.isNotEmpty() }
+                }
+            }
         } catch (e: Exception) {
             replyError = e.message ?: "加载评论失败"
         } finally {
@@ -98,13 +110,22 @@ fun FeedDetailScreen(
     LaunchedEffect(feedId, detailAttempt) {
         detail = null
         detailError = null
+        detailNotice = null
         replies = emptyList()
         replyPage = 1
         replyEndReached = false
         replyError = null
+        replyNotice = null
         try {
             val response = api.getFeedDetail(feedId)
-            detail = parseFeedDetail(response.data)
+            val parsed = parseFeedDetail(response.data)
+            detail = parsed
+            if (parsed.title.isNullOrEmpty() &&
+                parsed.body.isNullOrEmpty() &&
+                parsed.images.isEmpty()
+            ) {
+                detailNotice = response.message?.takeIf { it.isNotEmpty() }
+            }
             loadReplyPage(1, null)
         } catch (e: Exception) {
             detailError = e.message ?: "加载失败，请重试"
@@ -206,7 +227,10 @@ fun FeedDetailScreen(
                     ) {
                         item {
                             Text(
-                                text = "这条动态没有文字和图片内容",
+                                // Prefer the server's own reason (e.g.
+                                // the captcha gate) over the neutral line.
+                                text = detailNotice
+                                    ?: "这条动态没有文字和图片内容",
                                 style = MaterialTheme.typography.bodyMedium,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant,
                             )
@@ -214,7 +238,7 @@ fun FeedDetailScreen(
                     }
                     items(current.images, key = { it }) { url ->
                         AsyncImage(
-                            model = url,
+                            model = url.upgradedCoolapkUrl(),
                             contentDescription = null,
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -294,6 +318,15 @@ fun FeedDetailScreen(
                                     CircularProgressIndicator(modifier = Modifier.size(24.dp))
                                 }
                             }
+                            replyNotice != null -> {
+                                Text(
+                                    text = replyNotice ?: "",
+                                    modifier = Modifier.fillMaxWidth(),
+                                    textAlign = TextAlign.Center,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
                             replyEndReached -> {
                                 Text(
                                     text = "没有更多了",
@@ -349,7 +382,7 @@ private fun ReplyRow(reply: ReplyItem) {
             }
             reply.firstImage?.let { url ->
                 AsyncImage(
-                    model = url,
+                    model = url.upgradedCoolapkUrl(),
                     contentDescription = null,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -392,7 +425,7 @@ private fun Avatar(url: String?, name: String?, size: Dp) {
         }
     } else {
         AsyncImage(
-            model = url,
+            model = url.upgradedCoolapkUrl(),
             contentDescription = null,
             modifier = Modifier.size(size).clip(CircleShape),
             contentScale = ContentScale.Crop,
