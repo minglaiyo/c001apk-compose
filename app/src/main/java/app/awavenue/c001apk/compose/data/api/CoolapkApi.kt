@@ -2,14 +2,15 @@ package app.awavenue.c001apk.compose.data.api
 
 import app.awavenue.c001apk.compose.data.model.ApiListResponse
 import app.awavenue.c001apk.compose.data.model.ApiObjectResponse
+import app.awavenue.c001apk.compose.data.model.ApiReplyListResponse
 import retrofit2.http.GET
 import retrofit2.http.Query
 
 /**
  * Coolapk API surface ported from the Flutter app's api.dart /
  * network_repo.dart. Base URL is https://api.coolapk.com (the Flutter
- * URL_API_SERVICE); the api2 host (api2.coolapk.com) serves the home
- * index and reply lists and is not used by the skeleton yet.
+ * URL_API_SERVICE); endpoints on the api2 host (api2.coolapk.com) use
+ * absolute URLs, as the reply list does.
  *
  * Pagination follows the Flutter list controllers: pages start at 1 and
  * each follow-up page may pass the previous page's last item id as
@@ -37,6 +38,26 @@ interface CoolapkApi {
     suspend fun getFeedDetail(
         @Query("id") id: String,
     ): ApiObjectResponse
+
+    /**
+     * Reply list of one feed (Flutter: GET api2 /v6/feed/replyList).
+     * Absolute URL: this endpoint lives on api2, which overrides the
+     * client's api base URL. Defaults mirror the Flutter feed
+     * controller (listType lastupdate_desc, discussMode 1, feedType
+     * feed, blockStatus 0, fromFeedAuthor 0).
+     */
+    @GET("https://api2.coolapk.com/v6/feed/replyList")
+    suspend fun getFeedReply(
+        @Query("id") id: String,
+        @Query("listType") listType: String = "lastupdate_desc",
+        @Query("page") page: Int,
+        @Query("firstItem") firstItem: String? = null,
+        @Query("lastItem") lastItem: String? = null,
+        @Query("discussMode") discussMode: Int = 1,
+        @Query("feedType") feedType: String = "feed",
+        @Query("blockStatus") blockStatus: Int = 0,
+        @Query("fromFeedAuthor") fromFeedAuthor: Int = 0,
+    ): ApiReplyListResponse
 
     /** Product detail (Flutter: GET /v6/product/detail?id=). */
     @GET("v6/product/detail")
