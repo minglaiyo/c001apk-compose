@@ -3,6 +3,7 @@ package app.awavenue.c001apk.compose.ui.feed
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import app.awavenue.c001apk.compose.data.model.FeedItem
 import app.awavenue.c001apk.compose.data.repository.FeedRepository
 import kotlinx.coroutines.launch
 
@@ -21,6 +22,14 @@ class FeedViewModel(private val repository: FeedRepository) : ViewModel() {
 
     fun loadMore() {
         viewModelScope.launch { repository.loadMore() }
+    }
+
+    fun toggleLike(item: FeedItem) {
+        viewModelScope.launch { repository.toggleLike(item) }
+    }
+
+    fun consumeLikeError() {
+        repository.consumeLikeError()
     }
 }
 
