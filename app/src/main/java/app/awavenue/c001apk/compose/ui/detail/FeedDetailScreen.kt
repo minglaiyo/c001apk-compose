@@ -175,7 +175,9 @@ fun FeedDetailScreen(
         fun withLike(source: ReplyItem, likedValue: Boolean, count: Int): ReplyItem {
             return source.copy(
                 likenum = JsonPrimitive(count),
-                userAction = buildJsonObject { put("like", if (likedValue) 1 else 0) },
+                userAction = buildJsonObject {
+                    put("like", JsonPrimitive(if (likedValue) 1 else 0))
+                },
             )
         }
         replies = replies.map { if (it.displayId == id) withLike(it, newLiked, newCount) else it }
