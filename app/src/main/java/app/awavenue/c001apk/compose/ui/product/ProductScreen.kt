@@ -1,5 +1,6 @@
 package app.awavenue.c001apk.compose.ui.product
 
+import android.widget.Toast
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
@@ -44,12 +45,16 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.awavenue.c001apk.compose.data.api.CoolapkApi
+import app.awavenue.c001apk.compose.data.api.WriteOutcome
+import app.awavenue.c001apk.compose.data.api.toWriteOutcome
 import app.awavenue.c001apk.compose.data.model.ProductDetail
 import app.awavenue.c001apk.compose.data.model.parseProductDetail
 import app.awavenue.c001apk.compose.data.model.upgradedCoolapkUrl
+import app.awavenue.c001apk.compose.data.session.AccountStore
 import app.awavenue.c001apk.compose.ui.feed.TabFeedList
 import coil.compose.AsyncImage
 import java.net.URLDecoder
@@ -84,11 +89,14 @@ fun ProductScreen(
     var selectedTab by remember { mutableStateOf(0) }
     var sortChoice by remember { mutableStateOf(0) }
     var showSortMenu by remember { mutableStateOf(false) }
+    var followedOverride by remember { mutableStateOf<Boolean?>(null) }
     val scope = rememberCoroutineScope()
+    val context = LocalContext.current
 
     suspend fun loadDetail() {
         loading = true
         error = null
+        followedOverride = null
         try {
             val response = api.getProductDetail(productId)
             detail = parseProductDetail(response.data, productId)
@@ -101,9 +109,32 @@ fun ProductScreen(
         }
     }
 
+    fun toggleProductFollow() {
+        if (!AccountStore.isLoggedIn) return
+        val was = followedOverride ?: detail?.followed ?: false
+        followedOverride = !was
+        scope.launch {
+            // Inverted semantics: currently followed -> status 0 cancels.
+            val outcome = try {
+                api.changeProductFollow(productId, if (was) 0 else 1).toWriteOutcome()
+            } catch (e: Exception) {
+                WriteOutcome(false, e.message ?: "操作失败", null, null)
+            }
+            if (!outcome.ok) {
+                followedOverride = was
+                Toast.makeText(
+                    context,
+                    outcome.message.ifEmpty { "操作失败" },
+                    Toast.LENGTH_SHORT,
+                ).show()
+            }
+        }
+    }
+
     LaunchedEffect(productId) { loadDetail() }
 
     val currentDetail = detail
+    val effectiveFollowed = followedOverride ?: detail?.followed
     val tabUrls = currentDetail?.tabs?.map { tab ->
         when (sortChoice) {
             1 -> withProductListType(tab.url, "dateline_desc")
@@ -152,6 +183,17 @@ fun ProductScreen(
                         text = { Text("热门") },
                         onClick = { sortChoice = 2; showSortMenu = false },
                     )
+                    if (AccountStore.isLoggedIn) {
+                        DropdownMenuItem(
+                            text = {
+                                Text(if (effectiveFollowed == true) "取消关注" else "关注")
+                            },
+                            onClick = {
+                                toggleProductFollow()
+                                showSortMenu = false
+                            },
+                        )
+                    }
                 }
             },
         )
