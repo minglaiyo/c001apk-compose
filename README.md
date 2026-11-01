@@ -64,12 +64,18 @@ Stubbed / deliberately left out:
   (account session, posting, likes) is still not built.
 - Detail rendering is now full (author, images, counts, replies);
   reply posting, reply sorting, and nested reply threads are not
-  built yet.
+  built yet. Anonymous detail requests are captcha-gated by the
+  server (HTTP 200, message "当前访问需要验证码", data null), so
+  the detail screen shows the server's message when content comes
+  back empty; the full captcha/verification flow is not built.
 - Search, product detail screens, login, settings, and the Flutter
   fork's custom features (scroll-hide bars, back-to-top button,
   clipboard detection, and so on) are not built yet.
-- List images load original URLs. The Flutter fork's `.m.jpg`
-  thumbnail rewrite is a later port.
+- List and detail images upgrade the server's http Coolapk URLs to
+  https (Android blocks cleartext) and load through the app's
+  OkHttp client, because the image CDN rejects non-app
+  User-Agents with a 567. The Flutter fork's `.m.jpg`
+  thumbnail rewrite is still a later port.
 - Only `entityType == "feed"` items are rendered; other list card
   types (carousels, icon grids, title cards) are skipped for now.
 
