@@ -24,18 +24,27 @@ object ApiClient {
         coerceInputValues = true
     }
 
-    fun create(): CoolapkApi {
+    /**
+     * Shared OkHttp client: signing headers, anonymous session cookie
+     * jar, and basic logging. Coil reuses this client too, because the
+     * image CDN rejects requests without an app User-Agent (plain
+     * requests get a 567 from TencentEdgeOne, verified 2026-11-01).
+     */
+    val okHttpClient: OkHttpClient by lazy {
         val logging = HttpLoggingInterceptor().apply {
             level = HttpLoggingInterceptor.Level.BASIC
         }
-        val client = OkHttpClient.Builder()
+        OkHttpClient.Builder()
             .cookieJar(InMemoryCookieJar())
             .addInterceptor(CoolapkHeaders())
             .addInterceptor(logging)
             .build()
+    }
+
+    fun create(): CoolapkApi {
         return Retrofit.Builder()
             .baseUrl("https://api.coolapk.com/")
-            .client(client)
+            .client(okHttpClient)
             .addConverterFactory(
                 json.asConverterFactory("application/json".toMediaType()),
             )
