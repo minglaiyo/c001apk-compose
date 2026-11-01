@@ -11,8 +11,8 @@ One module, MVVM, Material3:
 
 - Feed list (hot ranking tab) with pull-to-refresh, endless load-more,
   Coil images, and tap-to-detail navigation.
-- Detail placeholder screen that already calls the feed-detail endpoint
-  and shows the returned title/body when present.
+- Detail screen with author header, title, body, images, like/comment
+  counts, and the reply list with paging (api2 replyList).
 - `applicationId = app.awavenue.c001apk.compose`, deliberately distinct
   from the Flutter build's `app.awavenue.c001apk`, so both apps can
   coexist on one device during the transition.
@@ -29,6 +29,7 @@ the fork's `cloud-debug-build` branch — none were invented.
 | `GET /v6/page/dataList` | `url`, `title`, `subTitle`, `page`, `firstItem?`, `lastItem?` |
 | `GET /v6/feed/detail` | `id` |
 | `GET /v6/product/detail` | `id` |
+| `GET https://api2.coolapk.com/v6/feed/replyList` | `id`, `listType=lastupdate_desc`, `page`, `lastItem?`, `discussMode=1`, `feedType=feed`, `blockStatus=0`, `fromFeedAuthor=0` |
 | `GET /v6/search` | `type=hotSearch`, `refresh=1`, `returnType=all` |
 | `GET /v6/search/suggestSearchWordsNew` | `searchValue` |
 
@@ -61,8 +62,9 @@ Stubbed / deliberately left out:
   format and an in-memory cookie jar for the anonymous session cookie.
   No account is involved: no login uid/token is sent. Login itself
   (account session, posting, likes) is still not built.
-- Detail rendering: only title/body are shown; author header, media
-  gallery, and replies are next steps.
+- Detail rendering is now full (author, images, counts, replies);
+  reply posting, reply sorting, and nested reply threads are not
+  built yet.
 - Search, product detail screens, login, settings, and the Flutter
   fork's custom features (scroll-hide bars, back-to-top button,
   clipboard detection, and so on) are not built yet.
@@ -96,7 +98,7 @@ for 7 days. No signing, no secrets.
 | `logic/network/network_repo.dart` (list loading) | `data/repository/FeedRepository.kt` |
 | `pages/home/feed/home_feed_controller.dart` | `ui/feed/FeedViewModel.kt` |
 | `pages/home/feed/home_feed_page.dart`, `common_body.dart` | `ui/feed/FeedListScreen.kt` |
-| `pages/feed/feed_page.dart` (detail) | `ui/detail/FeedDetailScreen.kt` (placeholder) |
+| `pages/feed/feed_page.dart` (detail) | `ui/detail/FeedDetailScreen.kt` |
 | `router/` | `ui/AppNavHost.kt` |
 | `main.dart` + `DynamicColorBuilder` theme | `MainActivity.kt` + `ui/theme/Theme.kt` |
 
