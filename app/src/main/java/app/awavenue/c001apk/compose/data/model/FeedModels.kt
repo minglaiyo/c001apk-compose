@@ -194,3 +194,33 @@ fun String.upgradedCoolapkUrl(): String {
     if (!host.endsWith(".coolapk.com")) return this
     return "https://" + substringAfter("http://")
 }
+
+/**
+ * Strips HTML markup from a server text for plain-text display.
+ * Coolapk message bodies can embed topic links such as
+ * `<a class="feed-link-tag" href="...">#Topic#</a>`; rendering them
+ * as text leaks raw tags into the UI (seen 2026-11-01). Tag text is
+ * kept (only the markup is removed), `<br>` and paragraph ends
+ * become newlines, and common entities are decoded. Links are not
+ * made tappable: the app has no topic page to navigate to yet.
+ */
+fun String.stripHtml(): String {
+    var text = replace(Regex("(?i)<br\\s*/?>"), "\n")
+    text = text.replace(Regex("(?i)</(p|div|tr|li)>"), "\n")
+    text = text.replace(Regex("<[^>]*>"), "")
+    text = text.replace("&nbsp;", " ")
+        .replace("&lt;", "<")
+        .replace("&gt;", ">")
+        .replace("&quot;", "\"")
+        .replace("&#39;", "'")
+        .replace("&apos;", "'")
+    text = Regex("&#(\\d+);").replace(text) {
+        it.groupValues[1].toIntOrNull()?.toChar()?.toString() ?: it.value
+    }
+    text = Regex("&#x([0-9a-fA-F]+);").replace(text) {
+        it.groupValues[1].toIntOrNull(16)?.toChar()?.toString() ?: it.value
+    }
+    // &amp; last: decoding it earlier would double-decode "&amp;lt;".
+    text = text.replace("&amp;", "&")
+    return text.trim()
+}
