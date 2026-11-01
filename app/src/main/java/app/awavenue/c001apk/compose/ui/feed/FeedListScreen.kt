@@ -35,6 +35,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import app.awavenue.c001apk.compose.data.model.FeedItem
+import app.awavenue.c001apk.compose.data.model.stripHtml
 import app.awavenue.c001apk.compose.data.model.upgradedCoolapkUrl
 import coil.compose.AsyncImage
 
@@ -207,7 +208,7 @@ private fun FeedCard(
                     }
                 }
             }
-            val headline = item.headline
+            val headline = item.headline?.stripHtml()
             if (!headline.isNullOrEmpty()) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
@@ -220,7 +221,7 @@ private fun FeedCard(
             // The message body is separate from the headline (Flutter
             // renders title + body); without this, feeds whose title
             // is the synthetic "XXX的动态" show no post text at all.
-            val body = item.message?.takeIf { it.isNotEmpty() && it != headline }
+            val body = item.message?.stripHtml()?.takeIf { it.isNotEmpty() && it != headline }
             if (!body.isNullOrEmpty()) {
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
