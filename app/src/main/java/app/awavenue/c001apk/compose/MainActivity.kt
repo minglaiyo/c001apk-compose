@@ -11,6 +11,7 @@ import androidx.navigation.compose.rememberNavController
 import app.awavenue.c001apk.compose.data.api.ApiClient
 import app.awavenue.c001apk.compose.data.api.CaptchaProofStore
 import app.awavenue.c001apk.compose.data.repository.FeedRepository
+import app.awavenue.c001apk.compose.data.session.AccountStore
 import app.awavenue.c001apk.compose.ui.AppNavHost
 import app.awavenue.c001apk.compose.ui.theme.C001apkComposeTheme
 import coil.Coil
@@ -34,6 +35,9 @@ class MainActivity : ComponentActivity() {
         // Captcha proof store (SharedPreferences) for the validate=
         // cookie protocol; must be ready before any API request.
         CaptchaProofStore.init(applicationContext)
+        // Account vault (EncryptedSharedPreferences); the API
+        // cookie jar reads the active account from it on each request.
+        AccountStore.init(applicationContext)
         // No DI framework in the skeleton: the graph is wired here.
         val api = ApiClient.create()
         val repository = FeedRepository(api)
