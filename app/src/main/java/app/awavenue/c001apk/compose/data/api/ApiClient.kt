@@ -35,7 +35,7 @@ object ApiClient {
             level = HttpLoggingInterceptor.Level.BASIC
         }
         OkHttpClient.Builder()
-            .cookieJar(InMemoryCookieJar())
+            .cookieJar(CaptchaCookieJar(InMemoryCookieJar()))
             .addInterceptor(CoolapkHeaders())
             .addInterceptor(logging)
             .build()
@@ -73,4 +73,33 @@ private class InMemoryCookieJar : CookieJar {
 
     override fun loadForRequest(url: HttpUrl): List<Cookie> =
         store[url.host].orEmpty()
+}
+
+/**
+ * Wraps the session jar with the captcha validate-cookie protocol:
+ * while [CaptchaProofStore] holds a proof younger than 24 hours, API
+ * requests to api.coolapk.com / api2.coolapk.com also carry
+ * `validate=<proof>`, mirroring the Flutter interceptor's automatic
+ * attach of the persisted validation. Image CDN hosts are excluded
+ * (the same client serves Coil images, which must not carry it).
+ */
+private class CaptchaCookieJar(
+    private val delegate: CookieJar,
+) : CookieJar {
+
+    override fun saveFromResponse(url: HttpUrl, cookies: List<Cookie>) {
+        delegate.saveFromResponse(url, cookies)
+    }
+
+    override fun loadForRequest(url: HttpUrl): List<Cookie> {
+        val cookies = delegate.loadForRequest(url).toMutableList()
+        if (url.host == "api.coolapk.com" || url.host == "api2.coolapk.com") {
+            val proof = CaptchaProofStore.validProof()
+            if (proof != null) {
+                val encoded = CaptchaChallenge.encodeForCookie(proof)
+                Cookie.parse(url, "validate=$encoded")?.let { cookies += it }
+            }
+        }
+        return cookies
+    }
 }
