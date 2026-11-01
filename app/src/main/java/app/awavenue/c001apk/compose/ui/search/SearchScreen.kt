@@ -447,7 +447,7 @@ fun SearchScreen(
                 contentAlignment = Alignment.Center,
             ) {
                 Text(
-                    text = "输入关键词，在$scopeLabel内搜索",
+                    text = "输入关键词，在${scopeLabel}内搜索",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
