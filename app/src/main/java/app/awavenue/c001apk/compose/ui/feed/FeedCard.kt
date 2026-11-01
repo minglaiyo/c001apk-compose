@@ -11,7 +11,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Favorite
+import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material3.Card
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -38,6 +42,10 @@ fun FeedCard(
     item: FeedItem,
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
+    // Like button, following the Flutter card's gate: only rendered
+    // when logged in (the caller passes showLikeButton accordingly).
+    showLikeButton: Boolean = false,
+    onLikeClick: (() -> Unit)? = null,
 ) {
     Card(
         modifier = modifier
@@ -122,13 +130,42 @@ fun FeedCard(
                     .fillMaxWidth()
                     .padding(top = 8.dp),
                 horizontalArrangement = Arrangement.spacedBy(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                item.likeCount?.let {
-                    Text(
-                        text = "赞 $it",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                if (showLikeButton && onLikeClick != null) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.clickable(onClick = onLikeClick),
+                    ) {
+                        Icon(
+                            imageVector = if (item.liked) {
+                                Icons.Default.Favorite
+                            } else {
+                                Icons.Default.FavoriteBorder
+                            },
+                            contentDescription = if (item.liked) "取消点赞" else "点赞",
+                            tint = if (item.liked) {
+                                MaterialTheme.colorScheme.error
+                            } else {
+                                MaterialTheme.colorScheme.onSurfaceVariant
+                            },
+                            modifier = Modifier.size(16.dp),
+                        )
+                        Spacer(modifier = Modifier.size(4.dp))
+                        Text(
+                            text = "赞 ${item.likeCount ?: "0"}",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                } else {
+                    item.likeCount?.let {
+                        Text(
+                            text = "赞 $it",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
                 item.commentCount?.let {
                     Text(
