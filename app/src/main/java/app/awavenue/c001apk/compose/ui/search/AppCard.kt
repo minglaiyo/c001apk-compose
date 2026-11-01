@@ -110,7 +110,7 @@ private fun statsFor(item: FeedItem): List<String> {
         "user" -> listOfNotNull(
             stat(item.follow.asText(), "关注"),
             stat(item.fans.asText(), "粉丝"),
-            formatActiveDay(item.logintime)?.let { "$it活跃" },
+            formatActiveDay(item.logintime)?.let { "${it}活跃" },
         )
         "apk", "game" -> listOfNotNull(
             stat(item.commentCount, "讨论"),
