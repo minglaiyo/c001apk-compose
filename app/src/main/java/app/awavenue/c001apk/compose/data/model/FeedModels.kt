@@ -2,6 +2,7 @@ package app.awavenue.c001apk.compose.data.model
 
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
@@ -96,3 +97,85 @@ fun JsonElement?.asText(): String? = when (this) {
     is JsonPrimitive -> if (isString) content else toString()
     else -> null
 }
+
+/**
+ * Parsed detail of one feed, read from the /v6/feed/detail data object
+ * (a Datum like the list items, plus a nested userInfo object).
+ */
+data class FeedDetail(
+    val username: String?,
+    val userAvatar: String?,
+    val title: String?,
+    val body: String?,
+    val images: List<String>,
+    val likeCount: String?,
+    val commentCount: String?,
+    val feedTypeName: String?,
+    val timeMillis: Long?,
+)
+
+/** Reads a string field from a detail object, if it is a non-empty JSON string. */
+private fun JsonObject.stringOrNull(key: String): String? =
+    (get(key) as? JsonPrimitive)?.contentOrNull?.takeIf { it.isNotEmpty() }
+
+private fun JsonElement?.toMillis(): Long? =
+    asText()?.toLongOrNull()?.let { if (it > 1_000_000_000_000L) it else it * 1000 }
+
+/** Parses the detail data object; missing keys stay null, never throw. */
+fun parseFeedDetail(data: JsonObject?): FeedDetail {
+    if (data == null) {
+        return FeedDetail(null, null, null, null, emptyList(), null, null, null, null)
+    }
+    val userInfo = data["userInfo"] as? JsonObject
+    val images = (data["picArr"] as? JsonArray).orEmpty().mapNotNull {
+        (it as? JsonPrimitive)?.contentOrNull?.takeIf { text -> text.isNotEmpty() }
+    }
+    return FeedDetail(
+        username = userInfo?.stringOrNull("username")
+            ?: data.stringOrNull("messageUsername"),
+        userAvatar = userInfo?.stringOrNull("userAvatar")
+            ?: data.stringOrNull("messageUserAvatar"),
+        title = data.stringOrNull("messageTitle"),
+        body = data.stringOrNull("message"),
+        images = images,
+        likeCount = data["likenum"].asText(),
+        commentCount = data["commentnum"].asText(),
+        feedTypeName = data.stringOrNull("feedTypeName"),
+        timeMillis = data["dateline"].toMillis(),
+    )
+}
+
+/**
+ * One reply from /v6/feed/replyList (Flutter ReplyRow, subset).
+ * rusername is the user being replied to, for nested replies.
+ */
+@Serializable
+data class ReplyItem(
+    val id: JsonElement? = null,
+    val entityId: JsonElement? = null,
+    val username: String? = null,
+    val rusername: String? = null,
+    val userAvatar: String? = null,
+    val message: String? = null,
+    val picArr: List<String>? = null,
+    val likenum: JsonElement? = null,
+    val replynum: JsonElement? = null,
+    val dateline: JsonElement? = null,
+) {
+    /** Stable identity for list keys, mirroring Flutter's entityType:id. */
+    val displayId: String?
+        get() = (id?.asText() ?: entityId?.asText())?.takeIf { it.isNotEmpty() }
+
+    val likeCount: String? get() = likenum.asText()
+    val replyCount: String? get() = replynum.asText()
+    val timeMillis: Long? get() = dateline.toMillis()
+    val firstImage: String?
+        get() = picArr?.firstOrNull()?.takeIf { it.isNotEmpty() }
+}
+
+/** Response envelope for the reply list endpoint. */
+@Serializable
+data class ApiReplyListResponse(
+    val message: String? = null,
+    val data: List<ReplyItem>? = null,
+)
