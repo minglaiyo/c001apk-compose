@@ -42,7 +42,8 @@ class CoolapkHeaders : Interceptor {
         return chain.proceed(request)
     }
 
-    private fun userAgent(): String {
+    /** App User-Agent, shared with the captcha WebView (the Flutter app uses the same UA there). */
+    internal fun userAgent(): String {
         val androidVersion = Build.VERSION.RELEASE
         val model = Build.MODEL
         val brand = Build.BRAND
