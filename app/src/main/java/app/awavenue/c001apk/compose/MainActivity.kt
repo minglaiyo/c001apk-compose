@@ -12,12 +12,21 @@ import app.awavenue.c001apk.compose.data.api.ApiClient
 import app.awavenue.c001apk.compose.data.repository.FeedRepository
 import app.awavenue.c001apk.compose.ui.AppNavHost
 import app.awavenue.c001apk.compose.ui.theme.C001apkComposeTheme
+import coil.ImageLoader
+import coil.compose.setSingletonImageLoaderFactory
 
 class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        // Images go through the app's OkHttp client, not Coil's
+        // default: the image CDN rejects non-app User-Agents (567).
+        setSingletonImageLoaderFactory { context ->
+            ImageLoader.Builder(context)
+                .okHttpClient { ApiClient.okHttpClient }
+                .build()
+        }
         // No DI framework in the skeleton: the graph is wired here.
         val api = ApiClient.create()
         val repository = FeedRepository(api)
