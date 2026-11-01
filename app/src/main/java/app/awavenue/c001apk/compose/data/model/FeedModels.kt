@@ -84,6 +84,10 @@ data class FeedItem(
     // Search results carry the reply count as replynum instead of
     // commentnum; the card prefers commentnum and falls back to it.
     val replynum: JsonElement? = null,
+    // Per-item user action state (like/follow), present only for
+    // logged-in requests; anonymous responses omit it entirely, so
+    // a missing userAction reads as "not liked".
+    val userAction: JsonObject? = null,
 ) {
     /** Stable identity for list keys, mirroring Flutter's entityType:id. */
     val displayId: String?
@@ -104,6 +108,8 @@ data class FeedItem(
 
     val likeCount: String? get() = likenum.asText()
     val commentCount: String? get() = commentnum.asText() ?: replynum.asText()
+    val liked: Boolean
+        get() = (userAction?.get("like") as? JsonPrimitive)?.contentOrNull?.toIntOrNull() == 1
 }
 
 /** Feed author, from the Flutter UserInfo model (subset). */
@@ -184,6 +190,7 @@ data class ReplyItem(
     val likenum: JsonElement? = null,
     val replynum: JsonElement? = null,
     val dateline: JsonElement? = null,
+    val userAction: JsonObject? = null,
 ) {
     /** Stable identity for list keys, mirroring Flutter's entityType:id. */
     val displayId: String?
@@ -191,6 +198,8 @@ data class ReplyItem(
 
     val likeCount: String? get() = likenum.asText()
     val replyCount: String? get() = replynum.asText()
+    val liked: Boolean
+        get() = (userAction?.get("like") as? JsonPrimitive)?.contentOrNull?.toIntOrNull() == 1
     val timeMillis: Long? get() = dateline.toMillis()
     val firstImage: String?
         get() = picArr?.firstOrNull()?.takeIf { it.isNotEmpty() }
@@ -257,9 +266,13 @@ data class TopicTab(
 
 /** Parsed topic detail (GET /v6/topic/newTagDetail). */
 data class TopicDetail(
+    val id: String? = null,
     val title: String?,
     val logo: String?,
     val tabs: List<TopicTab>,
+    // Follow state from the detail's userAction (follow == 1);
+    // null when the server did not report it.
+    val followed: Boolean? = null,
 )
 
 /** Parses the topic-detail data object; missing keys stay null/empty. */
@@ -272,9 +285,12 @@ fun parseTopicDetail(data: JsonObject?): TopicDetail? {
         if (title.isNullOrEmpty() || url.isNullOrEmpty()) null else TopicTab(title, url)
     }
     return TopicDetail(
+        id = data.stringOrNull("id"),
         title = data.stringOrNull("title"),
         logo = data.stringOrNull("logo"),
         tabs = tabs,
+        followed = (data["userAction"] as? JsonObject)?.get("follow")
+            ?.let { (it as? JsonPrimitive)?.contentOrNull?.toIntOrNull() == 1 },
     )
 }
 
@@ -302,6 +318,9 @@ data class ProductDetail(
     val ratingItems: List<RatingItem>,
     val specs: List<String>,
     val tabs: List<ProductTab>,
+    // Follow state from the detail's userAction (follow == 1);
+    // null when the server did not report it.
+    val followed: Boolean? = null,
 )
 
 private fun firstNonEmpty(vararg values: String?): String? =
@@ -406,5 +425,7 @@ fun parseProductDetail(data: JsonObject?, productId: String): ProductDetail? {
         ratingItems = ratingItems,
         specs = specs,
         tabs = tabs,
+        followed = (data["userAction"] as? JsonObject)?.get("follow")
+            ?.let { (it as? JsonPrimitive)?.contentOrNull?.toIntOrNull() == 1 },
     )
 }
