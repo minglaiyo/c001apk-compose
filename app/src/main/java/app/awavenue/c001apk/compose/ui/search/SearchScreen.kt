@@ -42,9 +42,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardActions
-import androidx.compose.ui.text.input.KeyboardOptions
 import androidx.compose.ui.unit.dp
 import app.awavenue.c001apk.compose.data.api.CoolapkApi
 import app.awavenue.c001apk.compose.data.model.FeedItem
