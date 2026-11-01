@@ -16,6 +16,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -57,6 +58,7 @@ fun FeedListScreen(
     viewModel: FeedViewModel,
     onItemClick: (feedId: String) -> Unit,
     onSearchClick: () -> Unit = {},
+    onAccountClick: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -67,6 +69,12 @@ fun FeedListScreen(
             TopAppBar(
                 title = { Text("热门") },
                 actions = {
+                    IconButton(onClick = onAccountClick) {
+                        Icon(
+                            imageVector = Icons.Default.Person,
+                            contentDescription = "账号",
+                        )
+                    }
                     IconButton(onClick = onSearchClick) {
                         Icon(
                             imageVector = Icons.Default.Search,
