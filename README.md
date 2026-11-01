@@ -65,9 +65,11 @@ Stubbed / deliberately left out:
 - Detail rendering is now full (author, images, counts, replies);
   reply posting, reply sorting, and nested reply threads are not
   built yet. Anonymous detail requests are captcha-gated by the
-  server (HTTP 200, message "当前访问需要验证码", data null), so
-  the detail screen shows the server's message when content comes
-  back empty; the full captcha/verification flow is not built.
+  server (HTTP 200, message "当前访问需要验证码", data null): the
+  detail screen shows the server's message when content comes
+  back empty, with a 去验证 button that opens the Netease widget
+  in a WebView; on success the proof replays the request via the
+  validate= cookie and is kept 24 hours.
 - Search, product detail screens, login, settings, and the Flutter
   fork's custom features (scroll-hide bars, back-to-top button,
   clipboard detection, and so on) are not built yet.
