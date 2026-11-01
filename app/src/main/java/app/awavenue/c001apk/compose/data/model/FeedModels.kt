@@ -47,7 +47,9 @@ data class FeedItem(
     val pic: String? = null,
     val picArr: List<String>? = null,
     val message: String? = null,
+    @SerialName("message_title")
     val messageTitle: String? = null,
+    @SerialName("message_cover")
     val messageCover: String? = null,
     @SerialName("cover_pic")
     val coverPic: String? = null,
