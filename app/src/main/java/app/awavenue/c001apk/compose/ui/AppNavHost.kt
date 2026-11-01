@@ -2,6 +2,7 @@ package app.awavenue.c001apk.compose.ui
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
@@ -18,6 +19,8 @@ import app.awavenue.c001apk.compose.ui.feed.FeedListScreen
 import app.awavenue.c001apk.compose.ui.feed.FeedViewModelFactory
 import app.awavenue.c001apk.compose.ui.login.LoginScreen
 import app.awavenue.c001apk.compose.ui.login.WebLoginScreen
+import app.awavenue.c001apk.compose.ui.post.EditorMode
+import app.awavenue.c001apk.compose.ui.post.FeedEditorScreen
 import app.awavenue.c001apk.compose.ui.product.ProductScreen
 import app.awavenue.c001apk.compose.ui.search.SearchScreen
 import app.awavenue.c001apk.compose.ui.topic.TopicScreen
@@ -51,6 +54,9 @@ fun AppNavHost(
                 },
                 onAccountClick = {
                     navController.navigate("accounts")
+                },
+                onPublishClick = {
+                    navController.navigate("editor?mode=post")
                 },
             )
         }
@@ -137,6 +143,13 @@ fun AppNavHost(
                         "search?pageType=tag&pageParam=" + URLEncoder.encode(topic, "UTF-8"),
                     )
                 },
+                onPublishClick = { topicId, topicTitle ->
+                    navController.navigate(
+                        "editor?mode=post&targetType=tag&targetId=" +
+                            URLEncoder.encode(topicId, "UTF-8") +
+                            "&targetTitle=" + URLEncoder.encode(topicTitle, "UTF-8"),
+                    )
+                },
             )
         }
         composable(
@@ -181,10 +194,94 @@ fun AppNavHost(
             ),
         ) { backStackEntry ->
             val feedId = backStackEntry.arguments?.getString("feedId").orEmpty()
+            val replyPublished by backStackEntry.savedStateHandle
+                .getStateFlow("replyPublished", false)
+                .collectAsStateWithLifecycle()
             FeedDetailScreen(
                 api = api,
                 feedId = feedId,
                 onBack = { navController.popBackStack() },
+                onReplyClick = {
+                    navController.navigate(
+                        "editor?mode=reply&targetId=$feedId&replyType=feed",
+                    )
+                },
+                onReplyToReply = { replyId, username ->
+                    navController.navigate(
+                        "editor?mode=reply&targetId=$replyId&replyType=reply&replyTo=" +
+                            URLEncoder.encode(username, "UTF-8"),
+                    )
+                },
+                replyPublished = replyPublished,
+                onReplyPublishedConsumed = {
+                    backStackEntry.savedStateHandle["replyPublished"] = false
+                },
+            )
+        }
+        composable(
+            route = "editor?mode={mode}&targetType={targetType}&targetId={targetId}&targetTitle={targetTitle}&replyType={replyType}&replyTo={replyTo}",
+            arguments = listOf(
+                navArgument("mode") {
+                    type = NavType.StringType
+                    defaultValue = "post"
+                },
+                navArgument("targetType") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                },
+                navArgument("targetId") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                },
+                navArgument("targetTitle") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                },
+                navArgument("replyType") {
+                    type = NavType.StringType
+                    defaultValue = "feed"
+                },
+                navArgument("replyTo") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                },
+            ),
+        ) { backStackEntry ->
+            val args = backStackEntry.arguments
+            fun decode(raw: String?): String? {
+                return raw?.let {
+                    try {
+                        URLDecoder.decode(it, "UTF-8")
+                    } catch (_: Exception) {
+                        it
+                    }
+                }
+            }
+            val mode = if (args?.getString("mode") == "reply") {
+                EditorMode.REPLY
+            } else {
+                EditorMode.POST
+            }
+            FeedEditorScreen(
+                api = api,
+                mode = mode,
+                targetType = args?.getString("targetType"),
+                targetId = args?.getString("targetId"),
+                targetTitle = decode(args?.getString("targetTitle")),
+                replyType = args?.getString("replyType") ?: "feed",
+                replyTo = decode(args?.getString("replyTo")),
+                onBack = { navController.popBackStack() },
+                onPublished = {
+                    navController.previousBackStackEntry?.savedStateHandle?.set(
+                        "replyPublished",
+                        true,
+                    )
+                    navController.popBackStack()
+                },
             )
         }
     }
