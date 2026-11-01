@@ -10,11 +10,14 @@ import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import app.awavenue.c001apk.compose.data.api.CoolapkApi
 import app.awavenue.c001apk.compose.data.repository.FeedRepository
+import app.awavenue.c001apk.compose.ui.account.AccountsScreen
 import app.awavenue.c001apk.compose.ui.common.PlaceholderScreen
 import app.awavenue.c001apk.compose.ui.common.routeForCardUrl
 import app.awavenue.c001apk.compose.ui.detail.FeedDetailScreen
 import app.awavenue.c001apk.compose.ui.feed.FeedListScreen
 import app.awavenue.c001apk.compose.ui.feed.FeedViewModelFactory
+import app.awavenue.c001apk.compose.ui.login.LoginScreen
+import app.awavenue.c001apk.compose.ui.login.WebLoginScreen
 import app.awavenue.c001apk.compose.ui.product.ProductScreen
 import app.awavenue.c001apk.compose.ui.search.SearchScreen
 import app.awavenue.c001apk.compose.ui.topic.TopicScreen
@@ -45,6 +48,32 @@ fun AppNavHost(
                 },
                 onSearchClick = {
                     navController.navigate("search")
+                },
+                onAccountClick = {
+                    navController.navigate("accounts")
+                },
+            )
+        }
+        composable("accounts") {
+            AccountsScreen(
+                onBack = { navController.popBackStack() },
+                onAddAccount = { navController.navigate("login") },
+            )
+        }
+        composable("login") {
+            LoginScreen(
+                onBack = { navController.popBackStack() },
+                onLoggedIn = { navController.popBackStack() },
+                onWebLogin = { navController.navigate("webLogin") },
+            )
+        }
+        composable("webLogin") {
+            WebLoginScreen(
+                onBack = { navController.popBackStack() },
+                onLoggedIn = {
+                    if (!navController.popBackStack("accounts", inclusive = false)) {
+                        navController.popBackStack()
+                    }
                 },
             )
         }
