@@ -220,9 +220,9 @@ fun ProductScreen(
                     if (expanded) {
                         Spacer(modifier = Modifier.height(8.dp))
                         val stats = listOfNotNull(
-                            currentDetail.hotNumTxt?.takeIf { it.isNotEmpty() }?.let { "$it热度" },
-                            currentDetail.feedCommentNumTxt?.takeIf { it.isNotEmpty() }?.let { "$it讨论" },
-                            currentDetail.followNumTxt?.takeIf { it.isNotEmpty() }?.let { "$it关注" },
+                            currentDetail.hotNumTxt?.takeIf { it.isNotEmpty() }?.let { "${it}热度" },
+                            currentDetail.feedCommentNumTxt?.takeIf { it.isNotEmpty() }?.let { "${it}讨论" },
+                            currentDetail.followNumTxt?.takeIf { it.isNotEmpty() }?.let { "${it}关注" },
                         )
                         if (stats.isNotEmpty()) {
                             Text(
@@ -241,7 +241,7 @@ fun ProductScreen(
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
-                                    text = "酷安评分" + (currentDetail.ratingCount?.let { " · $it人" } ?: ""),
+                                    text = "酷安评分" + (currentDetail.ratingCount?.let { " · ${it}人" } ?: ""),
                                     style = MaterialTheme.typography.bodySmall,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                                 )
