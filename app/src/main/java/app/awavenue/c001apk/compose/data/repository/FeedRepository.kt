@@ -1,11 +1,16 @@
 package app.awavenue.c001apk.compose.data.repository
 
 import app.awavenue.c001apk.compose.data.api.CoolapkApi
+import app.awavenue.c001apk.compose.data.api.toggleLike
 import app.awavenue.c001apk.compose.data.model.FeedItem
+import app.awavenue.c001apk.compose.data.model.asText
+import app.awavenue.c001apk.compose.data.session.AccountStore
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.buildJsonObject
 
 /** UI state for the feed list screen. */
 data class FeedUiState(
@@ -14,6 +19,7 @@ data class FeedUiState(
     val isLoadingMore: Boolean = false,
     val error: String? = null,
     val endReached: Boolean = false,
+    val likeError: String? = null,
 )
 
 /**
@@ -99,5 +105,57 @@ class FeedRepository(private val api: CoolapkApi) {
          * feed. Passed as the dataList `url` parameter verbatim.
          */
         const val DEFAULT_PAGE_URL = "/page?url=V9_HOME_TAB_RANKING"
+    }
+
+    /**
+     * Optimistic like toggle for one card, mirroring the Flutter
+     * onLike flow: the card flips immediately, the server count wins
+     * on success, and a failure restores the original item and
+     * reports the message (shown as a toast by the screen).
+     */
+    suspend fun toggleLike(item: FeedItem) {
+        val id = item.displayId ?: return
+        if (!AccountStore.isLoggedIn) return
+        val liked = item.liked
+        val newLiked = !liked
+        val oldCount = item.likenum.asText()?.toIntOrNull() ?: 0
+        val newCount = (oldCount + if (newLiked) 1 else -1).coerceAtLeast(0)
+        fun withLike(source: FeedItem, likedValue: Boolean, count: Int): FeedItem {
+            return source.copy(
+                likenum = JsonPrimitive(count),
+                userAction = buildJsonObject { put("like", if (likedValue) 1 else 0) },
+            )
+        }
+        _state.update { state ->
+            state.copy(
+                items = state.items.map {
+                    if (it.displayId == id) withLike(it, newLiked, newCount) else it
+                },
+            )
+        }
+        val outcome = toggleLike(api, id, liked, isReply = false)
+        if (outcome.ok) {
+            val serverCount = outcome.likeCount()?.toIntOrNull()
+            if (serverCount != null) {
+                _state.update { state ->
+                    state.copy(
+                        items = state.items.map {
+                            if (it.displayId == id) withLike(it, newLiked, serverCount) else it
+                        },
+                    )
+                }
+            }
+        } else {
+            _state.update { state ->
+                state.copy(
+                    items = state.items.map { if (it.displayId == id) item else it },
+                    likeError = outcome.message.ifEmpty { "操作失败" },
+                )
+            }
+        }
+    }
+
+    fun consumeLikeError() {
+        _state.update { it.copy(likeError = null) }
     }
 }
