@@ -15,10 +15,14 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -52,13 +56,26 @@ import coil.compose.AsyncImage
 fun FeedListScreen(
     viewModel: FeedViewModel,
     onItemClick: (feedId: String) -> Unit,
+    onSearchClick: () -> Unit = {},
     modifier: Modifier = Modifier,
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
 
     Scaffold(
         modifier = modifier,
-        topBar = { TopAppBar(title = { Text("热门") }) },
+        topBar = {
+            TopAppBar(
+                title = { Text("热门") },
+                actions = {
+                    IconButton(onClick = onSearchClick) {
+                        Icon(
+                            imageVector = Icons.Default.Search,
+                            contentDescription = "搜索",
+                        )
+                    }
+                },
+            )
+        },
     ) { padding ->
         PullToRefreshBox(
             isRefreshing = state.isRefreshing,
@@ -161,115 +178,6 @@ fun FeedListScreen(
                             }
                         }
                     }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun FeedCard(
-    item: FeedItem,
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    Card(
-        modifier = modifier
-            .fillMaxWidth()
-            .padding(horizontal = 12.dp)
-            .clickable(enabled = item.displayId != null, onClick = onClick),
-    ) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                val avatar = item.userAvatar?.takeIf { it.isNotEmpty() }
-                if (avatar != null) {
-                    AsyncImage(
-                        model = avatar.upgradedCoolapkUrl(),
-                        contentDescription = null,
-                        modifier = Modifier
-                            .size(36.dp)
-                            .clip(CircleShape),
-                        contentScale = ContentScale.Crop,
-                    )
-                    Spacer(modifier = Modifier.size(8.dp))
-                }
-                Column {
-                    Text(
-                        text = item.username?.takeIf { it.isNotEmpty() } ?: "酷友",
-                        style = MaterialTheme.typography.titleSmall,
-                    )
-                    val typeName = item.feedTypeName?.takeIf { it.isNotEmpty() }
-                    if (typeName != null) {
-                        Text(
-                            text = typeName,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        )
-                    }
-                }
-            }
-            val headline = item.headline?.stripHtml()
-            // The message body is separate from the headline (Flutter
-            // renders title + body); without this, feeds whose title
-            // is the synthetic "XXX的动态" show no post text at all.
-            val body = item.message?.stripHtml()?.takeIf { it.isNotEmpty() && it != headline }
-            // The server's synthetic moment title ("XXX的动态") only
-            // repeats the author line, so moment cards hide it and show
-            // only the body; a real title (message_title) still shows.
-            // When there is no body, the headline stays so the card is
-            // not left empty.
-            val redundantHeadline = !item.username.isNullOrEmpty() &&
-                headline == "${item.username}的动态"
-            if (!headline.isNullOrEmpty() && (!redundantHeadline || body.isNullOrEmpty())) {
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = headline,
-                    style = MaterialTheme.typography.bodyMedium,
-                    maxLines = 6,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            if (!body.isNullOrEmpty()) {
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = body,
-                    style = MaterialTheme.typography.bodyMedium,
-                    maxLines = 6,
-                    overflow = TextOverflow.Ellipsis,
-                )
-            }
-            val image = item.firstImage
-            if (image != null) {
-                Spacer(modifier = Modifier.height(8.dp))
-                AsyncImage(
-                    model = image.upgradedCoolapkUrl(),
-                    contentDescription = null,
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(180.dp)
-                        .clip(RoundedCornerShape(12.dp)),
-                    contentScale = ContentScale.Crop,
-                )
-            }
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(top = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(16.dp),
-            ) {
-                item.likeCount?.let {
-                    Text(
-                        text = "赞 $it",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-                item.commentCount?.let {
-                    Text(
-                        text = "评论 $it",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
                 }
             }
         }
