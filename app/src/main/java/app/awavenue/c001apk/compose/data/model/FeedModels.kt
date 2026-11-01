@@ -7,15 +7,20 @@ import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
+import java.net.URLDecoder
 
 /**
  * Response envelope for Coolapk list endpoints, mirroring the Flutter
  * DataListModel: a message plus a `data` array. Unknown fields are ignored
- * (the server envelope carries more than the skeleton needs).
+ * (the server envelope carries more than the skeleton needs). The
+ * captcha fields ride the same envelope on gated lists, so list
+ * screens can offer verification instead of showing an empty list.
  */
 @Serializable
 data class ApiListResponse(
     val message: String? = null,
+    val messageStatus: String? = null,
+    val messageExtra: JsonElement? = null,
     val data: List<FeedItem>? = null,
 )
 
@@ -56,6 +61,16 @@ data class FeedItem(
     val username: String? = null,
     val userAvatar: String? = null,
     val feedTypeName: String? = null,
+    // AppCard fields (search apk/topic/product/user rows): logo for
+    // apk/topic/product rows, download count for apk rows, follow /
+    // fans / last-login for user rows.
+    val logo: String? = null,
+    val downCount: JsonElement? = null,
+    @SerialName("feed_comment_num_txt")
+    val feedCommentNumTxt: String? = null,
+    val follow: JsonElement? = null,
+    val fans: JsonElement? = null,
+    val logintime: JsonElement? = null,
     // Real server key is hot_num_txt (the Flutter Datum maps it via
     // @JsonKey(name = "hot_num_txt")); the camelCase spelling parses
     // to nothing.
@@ -232,4 +247,164 @@ fun String.stripHtml(): String {
     // &amp; last: decoding it earlier would double-decode "&amp;lt;".
     text = text.replace("&amp;", "&")
     return text.trim()
+}
+
+/** One tab of a topic page: title + the list URL the server hands down. */
+data class TopicTab(
+    val title: String,
+    val url: String,
+)
+
+/** Parsed topic detail (GET /v6/topic/newTagDetail). */
+data class TopicDetail(
+    val title: String?,
+    val logo: String?,
+    val tabs: List<TopicTab>,
+)
+
+/** Parses the topic-detail data object; missing keys stay null/empty. */
+fun parseTopicDetail(data: JsonObject?): TopicDetail? {
+    if (data == null) return null
+    val tabs = (data["tabList"] as? JsonArray).orEmpty().mapNotNull { element ->
+        val tab = element as? JsonObject ?: return@mapNotNull null
+        val title = tab.stringOrNull("title")
+        val url = tab.stringOrNull("url")
+        if (title.isNullOrEmpty() || url.isNullOrEmpty()) null else TopicTab(title, url)
+    }
+    return TopicDetail(
+        title = data.stringOrNull("title"),
+        logo = data.stringOrNull("logo"),
+        tabs = tabs,
+    )
+}
+
+/** One tab of a product page, kept after the Flutter filter rules. */
+data class ProductTab(
+    val title: String,
+    val url: String,
+)
+
+/** One rating dimension row of a product header. */
+data class RatingItem(
+    val name: String,
+    val score: Double,
+)
+
+/** Parsed product detail (GET /v6/product/detail). */
+data class ProductDetail(
+    val title: String?,
+    val logo: String?,
+    val hotNumTxt: String?,
+    val feedCommentNumTxt: String?,
+    val followNumTxt: String?,
+    val score: Double?,
+    val ratingCount: String?,
+    val ratingItems: List<RatingItem>,
+    val specs: List<String>,
+    val tabs: List<ProductTab>,
+)
+
+private fun firstNonEmpty(vararg values: String?): String? =
+    values.firstOrNull { !it.isNullOrEmpty() }
+
+/** Decodes the inner /product/feedList?... query of a product tab URL. */
+private fun productTabQuery(tabUrl: String): Map<String, String>? {
+    val idx = tabUrl.indexOf("url=")
+    if (idx < 0) return null
+    val inner = try {
+        URLDecoder.decode(tabUrl.substring(idx + 4), "UTF-8")
+    } catch (_: Exception) {
+        return null
+    }
+    val q = inner.indexOf('?')
+    if (q < 0) return null
+    return inner.substring(q + 1).split('&').mapNotNull { part ->
+        val eq = part.indexOf('=')
+        if (eq < 0) null else part.substring(0, eq) to part.substring(eq + 1)
+    }.toMap()
+}
+
+/**
+ * Parses the product-detail data object, mirroring the Flutter
+ * ProductDetail field priorities. Tabs follow the Flutter filter:
+ * drop type main/rating, drop closed tabs (is_open present but not
+ * "1"), keep only tabs for this product id.
+ */
+fun parseProductDetail(data: JsonObject?, productId: String): ProductDetail? {
+    if (data == null) return null
+    val ratingItems = (data["rating_item_info"] as? JsonArray).orEmpty().mapNotNull { element ->
+        val item = element as? JsonObject ?: return@mapNotNull null
+        val name = firstNonEmpty(item.stringOrNull("name"), item.stringOrNull("title"))
+            ?: return@mapNotNull null
+        val scoreText = firstNonEmpty(
+            item["owner_average_score"].asText(),
+            item["average_score"].asText(),
+            item["v4_score"].asText(),
+            item["score"].asText(),
+        )
+        val score = scoreText?.toDoubleOrNull() ?: return@mapNotNull null
+        if (score <= 0) null else RatingItem(name, score)
+    }
+    val specs = (data["product_specs"] as? JsonArray).orEmpty().mapNotNull { element ->
+        when (element) {
+            is JsonPrimitive -> element.contentOrNull?.takeIf { it.isNotEmpty() }
+            is JsonObject -> firstNonEmpty(
+                element.stringOrNull("name"),
+                element.stringOrNull("title"),
+            )
+            else -> null
+        }
+    }
+    val tabs = (data["tabList"] as? JsonArray).orEmpty().mapNotNull { element ->
+        val tab = element as? JsonObject ?: return@mapNotNull null
+        val title = tab.stringOrNull("title")
+        val url = tab.stringOrNull("url")
+        if (title.isNullOrEmpty() || url.isNullOrEmpty()) return@mapNotNull null
+        val query = productTabQuery(url) ?: return@mapNotNull null
+        val type = query["type"] ?: return@mapNotNull null
+        if (type == "main" || type == "rating") return@mapNotNull null
+        if (query["id"] != productId) return@mapNotNull null
+        val isOpen = tab.stringOrNull("is_open")
+        if (isOpen != null && isOpen != "1") return@mapNotNull null
+        ProductTab(title, url)
+    }
+    return ProductDetail(
+        title = firstNonEmpty(
+            data.stringOrNull("title"),
+            data.stringOrNull("index_title"),
+            data.stringOrNull("alias_title"),
+            data.stringOrNull("name"),
+        ),
+        logo = firstNonEmpty(
+            data.stringOrNull("logo"),
+            data.stringOrNull("product_logo"),
+            data.stringOrNull("pic"),
+            data.stringOrNull("icon"),
+        ),
+        hotNumTxt = firstNonEmpty(
+            data.stringOrNull("hot_num_txt"),
+            data["hot_num"].asText(),
+        ),
+        feedCommentNumTxt = firstNonEmpty(
+            data.stringOrNull("feed_comment_num_txt"),
+            data["feed_comment_num"].asText(),
+        ),
+        followNumTxt = firstNonEmpty(
+            data.stringOrNull("follow_num_txt"),
+            data["follow_num"].asText(),
+        ),
+        score = firstNonEmpty(
+            data["owner_star_average_score"].asText(),
+            data["rating_average_score"].asText(),
+        )?.toDoubleOrNull(),
+        ratingCount = firstNonEmpty(
+            data["owner_rating_total_num"].asText(),
+            data["rating_total_num"].asText(),
+            data["owner_star_total_count"].asText(),
+            data["star_total_count"].asText(),
+        ),
+        ratingItems = ratingItems,
+        specs = specs,
+        tabs = tabs,
+    )
 }
