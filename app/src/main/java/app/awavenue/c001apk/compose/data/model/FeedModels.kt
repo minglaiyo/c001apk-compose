@@ -66,6 +66,9 @@ data class FeedItem(
     val uid: JsonElement? = null,
     val likenum: JsonElement? = null,
     val commentnum: JsonElement? = null,
+    // Search results carry the reply count as replynum instead of
+    // commentnum; the card prefers commentnum and falls back to it.
+    val replynum: JsonElement? = null,
 ) {
     /** Stable identity for list keys, mirroring Flutter's entityType:id. */
     val displayId: String?
@@ -85,7 +88,7 @@ data class FeedItem(
             ?: message?.takeIf { it.isNotEmpty() }
 
     val likeCount: String? get() = likenum.asText()
-    val commentCount: String? get() = commentnum.asText()
+    val commentCount: String? get() = commentnum.asText() ?: replynum.asText()
 }
 
 /** Feed author, from the Flutter UserInfo model (subset). */
