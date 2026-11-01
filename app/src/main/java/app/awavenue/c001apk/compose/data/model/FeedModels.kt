@@ -27,6 +27,8 @@ data class ApiListResponse(
 @Serializable
 data class ApiObjectResponse(
     val message: String? = null,
+    val messageStatus: String? = null,
+    val messageExtra: JsonElement? = null,
     val data: JsonObject? = null,
 )
 
@@ -178,6 +180,8 @@ data class ReplyItem(
 @Serializable
 data class ApiReplyListResponse(
     val message: String? = null,
+    val messageStatus: String? = null,
+    val messageExtra: JsonElement? = null,
     val data: List<ReplyItem>? = null,
 )
 
