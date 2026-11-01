@@ -247,6 +247,7 @@ fun TopicScreen(
                 }
             }
         }
+    }
         if (AccountStore.isLoggedIn && currentDetail != null) {
             FloatingActionButton(
                 onClick = {
@@ -265,7 +266,6 @@ fun TopicScreen(
                 )
             }
         }
-    }
     }
 }
 
