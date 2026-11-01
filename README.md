@@ -54,13 +54,13 @@ Implemented:
 
 Stubbed / deliberately left out:
 
-- **Authentication and request signing.** The Flutter app signs every
-  request with an `X-App-Token` v3 value derived from an embedded auth
-  blob plus bcrypt. That blob is secret material and is NOT copied
-  here. The skeleton sends no token and no session cookie. If the
-  server rejects unsigned requests, the feed screen shows its error
-  state; porting the token signer is the required next step before
-  real use.
+- **Request signing for anonymous browsing.** Every request carries the
+  signed `X-App-Token` v3 header, ported from the Flutter app's
+  `TokenUtils.getTokenV3` (same algorithm, same public protocol lookup
+  data, plus bcrypt), with a per-process device code in the Flutter
+  format and an in-memory cookie jar for the anonymous session cookie.
+  No account is involved: no login uid/token is sent. Login itself
+  (account session, posting, likes) is still not built.
 - Detail rendering: only title/body are shown; author header, media
   gallery, and replies are next steps.
 - Search, product detail screens, login, settings, and the Flutter
