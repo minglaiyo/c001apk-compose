@@ -3,6 +3,7 @@ package app.awavenue.c001apk.compose.data.api
 import app.awavenue.c001apk.compose.data.model.ApiListResponse
 import app.awavenue.c001apk.compose.data.model.ApiObjectResponse
 import app.awavenue.c001apk.compose.data.model.ApiReplyListResponse
+import kotlinx.serialization.json.JsonObject
 import retrofit2.http.GET
 import retrofit2.http.Query
 
@@ -67,19 +68,40 @@ interface CoolapkApi {
 
     /**
      * Hot searches (Flutter: GET /v6/search?type=hotSearch&refresh=1&
-     * returnType=all). Not wired to UI yet; kept so search work starts
-     * from a verified endpoint.
+     * returnType=all). Returns the raw envelope: the hot payload is
+     * nested card containers (hotSearch / searchHotListCard with
+     * recursive `entities`), not feed items, so the screen flattens
+     * it itself instead of parsing it as a feed list.
      */
     @GET("v6/search")
     suspend fun getHotSearch(
         @Query("type") type: String = "hotSearch",
         @Query("refresh") refresh: Int = 1,
         @Query("returnType") returnType: String = "all",
-    ): ApiListResponse
+    ): JsonObject
 
     /** Search suggestions (Flutter: GET /v6/search/suggestSearchWordsNew). */
     @GET("v6/search/suggestSearchWordsNew")
     suspend fun getSearchSuggest(
         @Query("searchValue") searchValue: String,
+    ): ApiListResponse
+
+    /**
+     * Search results (Flutter: NetworkRepo.getSearch, GET /v6/search).
+     * The feed tab (type=feed) returns full feed items, so results
+     * reuse FeedItem + FeedCard. Other tabs (apk/game/feedTopic/
+     * product/user) need their own cards and are not built yet.
+     */
+    @GET("v6/search")
+    suspend fun getSearch(
+        @Query("type") type: String,
+        @Query("feedType") feedType: String = "all",
+        @Query("sort") sort: String = "default",
+        @Query("searchValue") searchValue: String,
+        @Query("isStrict") isStrict: Int = 0,
+        @Query("page") page: Int,
+        @Query("firstItem") firstItem: String? = null,
+        @Query("lastItem") lastItem: String? = null,
+        @Query("showAnonymous") showAnonymous: Int = -1,
     ): ApiListResponse
 }
