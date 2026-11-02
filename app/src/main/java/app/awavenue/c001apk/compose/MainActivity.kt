@@ -10,6 +10,7 @@ import androidx.compose.ui.Modifier
 import androidx.navigation.compose.rememberNavController
 import app.awavenue.c001apk.compose.data.api.ApiClient
 import app.awavenue.c001apk.compose.data.api.CaptchaProofStore
+import app.awavenue.c001apk.compose.data.api.TokenV3
 import app.awavenue.c001apk.compose.data.repository.FeedRepository
 import app.awavenue.c001apk.compose.data.session.AccountStore
 import app.awavenue.c001apk.compose.ui.AppNavHost
@@ -32,6 +33,9 @@ class MainActivity : ComponentActivity() {
                 .okHttpClient(ApiClient.okHttpClient)
                 .build()
         })
+        // Stable device identity for request signing (persisted on
+        // first run); must be ready before any API request.
+        TokenV3.init(applicationContext)
         // Captcha proof store (SharedPreferences) for the validate=
         // cookie protocol; must be ready before any API request.
         CaptchaProofStore.init(applicationContext)
