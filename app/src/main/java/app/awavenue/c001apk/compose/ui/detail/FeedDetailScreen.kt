@@ -87,6 +87,7 @@ fun FeedDetailScreen(
     modifier: Modifier = Modifier,
     onReplyClick: () -> Unit = {},
     onReplyToReply: (String, String) -> Unit = { _, _ -> },
+    onThreadClick: (ReplyItem) -> Unit = {},
     replyPublished: Boolean = false,
     onReplyPublishedConsumed: () -> Unit = {},
 ) {
@@ -463,6 +464,7 @@ fun FeedDetailScreen(
                                     onReplyToReply(id, reply.username.orEmpty())
                                 }
                             },
+                            onThreadClick = { onThreadClick(reply) },
                         )
                     }
                     item {
@@ -558,11 +560,13 @@ fun FeedDetailScreen(
 
 /** One reply card: avatar, author (+ replied-to user), text, image, counts. */
 @Composable
-private fun ReplyRow(
+internal fun ReplyRow(
     reply: ReplyItem,
     showActions: Boolean = false,
     onLikeClick: () -> Unit = {},
     onReplyClick: () -> Unit = {},
+    onThreadClick: () -> Unit = {},
+    threadEntryEnabled: Boolean = true,
 ) {
     Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
         Avatar(url = reply.userAvatar, name = reply.username, size = 36.dp)
@@ -594,16 +598,41 @@ private fun ReplyRow(
                 )
             }
             if (showActions) {
-                val meta = listOfNotNull(
-                    reply.replyCount?.let { "$it 条回复" },
-                    formatTime(reply.timeMillis),
-                ).joinToString(" · ")
-                if (meta.isNotEmpty()) {
-                    Text(
-                        text = meta,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                val threadCount = reply.replyCount?.toIntOrNull()
+                val threadTime = formatTime(reply.timeMillis)
+                val countModifier = if (threadEntryEnabled) {
+                    Modifier.clickable(onClick = onThreadClick)
+                } else {
+                    Modifier
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (threadCount != null && threadCount > 0) {
+                        Text(
+                            text = "$threadCount 条回复",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = countModifier,
+                        )
+                        if (threadTime != null) {
+                            Text(
+                                text = " · $threadTime",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    } else {
+                        val meta = listOfNotNull(
+                            reply.replyCount?.let { "$it 条回复" },
+                            threadTime,
+                        ).joinToString(" · ")
+                        if (meta.isNotEmpty()) {
+                            Text(
+                                text = meta,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
                 }
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -642,17 +671,63 @@ private fun ReplyRow(
                     )
                 }
             } else {
-                val plainMeta = listOfNotNull(
-                    reply.likeCount?.let { "赞 $it" },
-                    reply.replyCount?.let { "$it 条回复" },
-                    formatTime(reply.timeMillis),
-                ).joinToString(" · ")
-                if (plainMeta.isNotEmpty()) {
-                    Text(
-                        text = plainMeta,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
+                val plainCount = reply.replyCount?.toIntOrNull()
+                val plainTime = formatTime(reply.timeMillis)
+                val plainCountModifier = if (threadEntryEnabled) {
+                    Modifier.clickable(onClick = onThreadClick)
+                } else {
+                    Modifier
+                }
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    val likePart = reply.likeCount?.let { "赞 $it" }
+                    if (likePart != null) {
+                        Text(
+                            text = likePart,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                    if (plainCount != null && plainCount > 0) {
+                        if (likePart != null) {
+                            Text(
+                                text = " · ",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                        Text(
+                            text = "$plainCount 条回复",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = plainCountModifier,
+                        )
+                        if (plainTime != null) {
+                            Text(
+                                text = " · $plainTime",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    } else {
+                        val rest = listOfNotNull(
+                            reply.replyCount?.let { "$it 条回复" },
+                            plainTime,
+                        ).joinToString(" · ")
+                        if (rest.isNotEmpty()) {
+                            if (likePart != null) {
+                                Text(
+                                    text = " · ",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                            Text(
+                                text = rest,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -687,7 +762,7 @@ private fun Avatar(url: String?, name: String?, size: Dp) {
 }
 
 /** Epoch seconds (or millis) to "yyyy-MM-dd HH:mm", or null when unusable. */
-private fun formatTime(millis: Long?): String? {
+internal fun formatTime(millis: Long?): String? {
     if (millis == null || millis <= 0) return null
     return try {
         SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date(millis))
