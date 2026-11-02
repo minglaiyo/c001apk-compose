@@ -11,11 +11,13 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
 import app.awavenue.c001apk.compose.data.api.CoolapkApi
+import app.awavenue.c001apk.compose.data.model.ReplyItem
 import app.awavenue.c001apk.compose.data.repository.FeedRepository
 import app.awavenue.c001apk.compose.ui.account.AccountsScreen
 import app.awavenue.c001apk.compose.ui.common.PlaceholderScreen
 import app.awavenue.c001apk.compose.ui.common.routeForCardUrl
 import app.awavenue.c001apk.compose.ui.detail.FeedDetailScreen
+import app.awavenue.c001apk.compose.ui.detail.ThreadScreen
 import app.awavenue.c001apk.compose.ui.feed.FeedListScreen
 import app.awavenue.c001apk.compose.ui.feed.FeedViewModelFactory
 import app.awavenue.c001apk.compose.ui.login.LoginScreen
@@ -27,6 +29,12 @@ import app.awavenue.c001apk.compose.ui.search.SearchScreen
 import app.awavenue.c001apk.compose.ui.topic.TopicScreen
 import java.net.URLDecoder
 import java.net.URLEncoder
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.json.Json
+
+/** JSON for nav-arg objects (thread origin reply); lenient like the api client. */
+private val navJson = Json { ignoreUnknownKeys = true }
 
 /** Routes: feed list, detail, search, topic, product, placeholder. */
 @Composable
@@ -213,11 +221,53 @@ fun AppNavHost(
                             URLEncoder.encode(username, "UTF-8"),
                     )
                 },
+                onThreadClick = { reply ->
+                    val encoded = URLEncoder.encode(
+                        navJson.encodeToString(reply),
+                        "UTF-8",
+                    )
+                    navController.navigate("thread?reply=$encoded")
+                },
                 replyPublished = replyPublished,
                 onReplyPublishedConsumed = {
                     backStackEntry.savedStateHandle["replyPublished"] = false
                 },
             )
+        }
+        composable(
+            route = "thread?reply={reply}",
+            arguments = listOf(
+                navArgument("reply") { type = NavType.StringType },
+            ),
+        ) { backStackEntry ->
+            val rawReply = backStackEntry.arguments?.getString("reply").orEmpty()
+            val origin = try {
+                navJson.decodeFromString<ReplyItem>(
+                    URLDecoder.decode(rawReply, "UTF-8"),
+                )
+            } catch (_: Exception) {
+                null
+            }
+            val threadPublished by backStackEntry.savedStateHandle
+                .getStateFlow("replyPublished", false)
+                .collectAsStateWithLifecycle()
+            if (origin != null) {
+                ThreadScreen(
+                    api = api,
+                    origin = origin,
+                    onBack = { navController.popBackStack() },
+                    onReplyToReply = { replyId, username ->
+                        navController.navigate(
+                            "editor?mode=reply&targetId=$replyId&replyType=reply&replyTo=" +
+                                URLEncoder.encode(username, "UTF-8"),
+                        )
+                    },
+                    replyPublished = threadPublished,
+                    onReplyPublishedConsumed = {
+                        backStackEntry.savedStateHandle["replyPublished"] = false
+                    },
+                )
+            }
         }
         composable(
             route = "editor?mode={mode}&targetType={targetType}&targetId={targetId}&targetTitle={targetTitle}&replyType={replyType}&replyTo={replyTo}",
