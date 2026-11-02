@@ -9,6 +9,7 @@ import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
+import java.net.Proxy
 
 /**
  * Builds the Retrofit client for https://api.coolapk.com (the Flutter
@@ -40,6 +41,13 @@ object ApiClient {
             .cookieJar(CaptchaCookieJar(AuthCookieJar(sessionJar)))
             .addInterceptor(CoolapkHeaders())
             .addInterceptor(logging)
+            // Direct connection only: OkHttp honors the system/Wi-Fi
+            // proxy by default, but the official client's Dart stack
+            // connects directly, ignoring it. A leftover proxy setting
+            // routes our requests through a proxy the server's write
+            // risk control flags (businessStatus -10), while the
+            // official app on the same phone and network works.
+            .proxy(Proxy.NO_PROXY)
             .build()
     }
 
