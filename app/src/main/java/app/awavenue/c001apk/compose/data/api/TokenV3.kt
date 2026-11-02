@@ -1,5 +1,6 @@
 package app.awavenue.c001apk.compose.data.api
 
+import android.content.Context
 import android.os.Build
 import android.util.Base64
 import java.security.MessageDigest
@@ -15,9 +16,13 @@ import org.mindrot.jbcrypt.BCrypt
  * token_v3_data.dart (sourced from coolapk-desktop's public protocol data):
  * client signing material from the open-source clients, not any user's
  * credential. No account is involved: no uid, no login token, no session
- * cookie of any user is sent or stored. The device code is generated fresh
- * per process from a random id plus this device's own Build fields, in the
- * Flutter format; nothing is persisted yet.
+ * cookie of any user is sent or stored. The device code is generated once
+ * in the Flutter format and then persisted (mirroring Flutter's
+ * GStorage.xAppDevice), because the server's write risk control treats a
+ * device identity that changes on every launch as suspicious: with a
+ * per-process code, reply/publish requests were rejected with the
+ * server's risk-control message (businessStatus -10) while the official
+ * app on the same phone and network posted fine.
  */
 object TokenV3 {
 
@@ -28,8 +33,31 @@ object TokenV3 {
         "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
     private val SALT_REGEX = Regex("^[./A-Za-z0-9]{22}$")
 
-    /** Per-process device code in the Flutter format. */
-    val deviceCode: String by lazy { generateDeviceCode() }
+    private const val PREFS_NAME = "coolapk_device_prefs"
+    private const val KEY_DEVICE_CODE = "x_app_device"
+
+    private var storedDeviceCode: String? = null
+
+    /**
+     * Loads the persisted device code, generating and storing one on
+     * first run. Must be called before any API request (MainActivity
+     * does this in onCreate); before init, [deviceCode] falls back to
+     * a per-process code so signing never crashes.
+     */
+    fun init(context: Context) {
+        val prefs = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        val existing = prefs.getString(KEY_DEVICE_CODE, null)
+        storedDeviceCode = if (!existing.isNullOrEmpty()) {
+            existing
+        } else {
+            generateDeviceCode().also { code ->
+                prefs.edit().putString(KEY_DEVICE_CODE, code).apply()
+            }
+        }
+    }
+
+    /** Device code, stable across launches once init() has run. */
+    val deviceCode: String by lazy { storedDeviceCode ?: generateDeviceCode() }
 
     /**
      * Derives a fresh v3 request signature, exactly like the Dart version:
