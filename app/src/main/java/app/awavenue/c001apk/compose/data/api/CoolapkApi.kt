@@ -65,6 +65,25 @@ interface CoolapkApi {
         @Query("fromFeedAuthor") fromFeedAuthor: Int = 0,
     ): ApiReplyListResponse
 
+    /**
+     * Nested replies of one reply (Flutter: GET api /v6/feed/replyList,
+     * listType empty, discussMode 0, feedType feed_reply). Relative
+     * URL: this endpoint lives on api, the client's base URL, unlike
+     * the feed reply list which lives on api2.
+     */
+    @GET("v6/feed/replyList")
+    suspend fun getReply2Reply(
+        @Query("id") id: String,
+        @Query("listType") listType: String = "",
+        @Query("page") page: Int,
+        @Query("firstItem") firstItem: String? = null,
+        @Query("lastItem") lastItem: String? = null,
+        @Query("discussMode") discussMode: Int = 0,
+        @Query("feedType") feedType: String = "feed_reply",
+        @Query("blockStatus") blockStatus: Int = 0,
+        @Query("fromFeedAuthor") fromFeedAuthor: Int = 0,
+    ): ApiReplyListResponse
+
     /** Product detail (Flutter: GET /v6/product/detail?id=). */
     @GET("v6/product/detail")
     suspend fun getProductDetail(
